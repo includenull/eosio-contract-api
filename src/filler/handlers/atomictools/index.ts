@@ -1,15 +1,15 @@
 import * as fs from 'fs';
 import { PoolClient } from 'pg';
 
-import { ContractHandler } from '../interfaces';
-import logger from '../../../utils/winston';
-import { ConfigTableRow } from './types/tables';
-import Filler from '../../filler';
-import DataProcessor from '../../processor';
-import { configProcessor } from './processors/config';
-import { linkProcessor } from './processors/links';
-import { ATOMICASSETS_BASE_PRIORITY } from '../atomicassets';
-import { logProcessor } from './processors/logs';
+import { ContractHandler } from '../interfaces.js';
+import logger from '../../../utils/winston.js';
+import { ConfigTableRow } from './types/tables.js';
+import Filler from '../../filler.js';
+import DataProcessor from '../../processor.js';
+import { configProcessor } from './processors/config.js';
+import { linkProcessor } from './processors/links.js';
+import { ATOMICASSETS_BASE_PRIORITY } from '../atomicassets/index.js';
+import { logProcessor } from './processors/logs.js';
 
 export const ATOMICTOOLS_BASE_PRIORITY = ATOMICASSETS_BASE_PRIORITY + 1000;
 

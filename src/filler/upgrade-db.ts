@@ -1,11 +1,16 @@
-import logger from '../utils/winston';
+import logger from '../utils/winston.js';
 import * as fs from 'fs';
-import { handlers } from './handlers/loader';
-import { compareVersionString } from '../utils';
-import PostgresConnection from '../connections/postgres';
-import { IReaderConfig } from '../types/config';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { handlers } from './handlers/loader.js';
+import { compareVersionString } from '../utils/index.js';
+import PostgresConnection from '../connections/postgres.js';
+import { IReaderConfig } from '../types/config.js';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+
 const readerConfigs: IReaderConfig[] = require('../../config/readers.config.json');
 
 export async function upgradeDb(database: PostgresConnection): Promise<void> {
@@ -67,20 +72,20 @@ export async function upgradeDb(database: PostgresConnection): Promise<void> {
         logger.info('Found ' + upgradeVersions.length + ' available upgrades. Starting to upgradeDB...');
 
         for (const version of upgradeVersions) {
-            const versionDir = `${__dirname}/../../definitions/migrations/${version}/`;
+            const versionDir = join(__dirname, '../../definitions/migrations', version);
 
             logger.info('Upgrade to ' + version + ' ...');
 
             await client.query('BEGIN');
 
-            await client.query(fs.readFileSync(`${versionDir}database.sql`, {
+            await client.query(fs.readFileSync(join(versionDir, 'database.sql'), {
                 encoding: 'utf8'
             }));
 
             for (const handlerName of availableContracts) {
                 const handler = availableHandlers.find(row => row.handlerName === handlerName);
 
-                const handlerFilename = `${versionDir}${handlerName}.sql`;
+                const handlerFilename = join(versionDir, `${handlerName}.sql`);
                 if (fs.existsSync(handlerFilename)) {
                     await client.query(fs.readFileSync(handlerFilename, {encoding: 'utf8'}));
                 }

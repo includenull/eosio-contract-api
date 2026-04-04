@@ -1,14 +1,14 @@
-import {buildBoundaryFilter, RequestValues} from '../../utils';
-import {AtomicMarketContext} from '../index';
-import QueryBuilder from '../../../builder';
-import {buildAssetQueryCondition} from '../../atomicassets/handlers/assets';
-import {filterQueryArgs} from '../../validation';
+import {buildBoundaryFilter, RequestValues} from '../../utils.js';
+import {AtomicMarketContext} from '../index.js';
+import QueryBuilder from '../../../builder.js';
+import {buildAssetQueryCondition} from '../../atomicassets/handlers/assets.js';
+import {filterQueryArgs} from '../../validation.js';
 import {
     ICollectionsMasterView,
     IUserInventoryCollectionsPrices,
     IUserInventoryPriceResponse, IUserInventoryPrices,
     IUserInventoryPricesQueryResponse
-} from '../../../../types/models';
+} from '../../../../types/models.js';
 import {oneLine} from 'common-tags';
 
 export async function getPricesAction(params: RequestValues, ctx: AtomicMarketContext): Promise<any> {

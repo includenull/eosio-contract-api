@@ -1,17 +1,17 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicToolsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
+import { AtomicToolsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
 import {
     actionGreylistParameters,
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { LinkState } from '../../../../filler/handlers/atomictools';
-import { greylistFilterParameters } from '../../atomicassets/openapi';
-import { getLinkAction, getLinkLogsAction, getLinksAction, getLinksCountAction } from '../handlers/links';
+} from '../../../docs.js';
+import { LinkState } from '../../../../filler/handlers/atomictools/index.js';
+import { greylistFilterParameters } from '../../atomicassets/openapi.js';
+import { getLinkAction, getLinkLogsAction, getLinksAction, getLinksCountAction } from '../handlers/links.js';
 
 export function linksEndpoints(core: AtomicToolsNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

@@ -1,9 +1,9 @@
-import { buildBoundaryFilter, RequestValues } from '../../utils';
-import { AtomicAssetsContext } from '../index';
-import QueryBuilder from '../../../builder';
-import { buildAssetFilter, buildGreylistFilter, buildHideOffersFilter } from '../utils';
-import { formatCollection } from '../format';
-import { filterQueryArgs } from '../../validation';
+import { buildBoundaryFilter, RequestValues } from '../../utils.js';
+import { AtomicAssetsContext } from '../index.js';
+import QueryBuilder from '../../../builder.js';
+import { buildAssetFilter, buildGreylistFilter, buildHideOffersFilter } from '../utils.js';
+import { formatCollection } from '../format.js';
+import { filterQueryArgs } from '../../validation.js';
 
 export async function getBurnsAction(params: RequestValues, ctx: AtomicAssetsContext): Promise<any> {
     const maxLimit = ctx.coreArgs.limits?.burns || 5000;

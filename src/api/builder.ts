@@ -1,4 +1,4 @@
-import { isWeakIntArray } from '../utils';
+import { isWeakIntArray } from '../utils/index.js';
 
 export default class QueryBuilder {
     private baseQuery: string;

@@ -1,15 +1,14 @@
 import { PoolClient, QueryResult } from 'pg';
 import AwaitLock from 'await-lock';
-// @ts-ignore
-import * as exitHook from 'async-exit-hook';
+import asyncExitHook from 'async-exit-hook';
 
-import ConnectionManager from '../connections/manager';
-import { ShipBlock } from '../types/ship';
-import { eosioTimestampToDate } from '../utils/eosio';
-import { arrayChunk, arraysEqual } from '../utils';
-import logger from '../utils/winston';
-import { EosioActionTrace, EosioTransaction } from '../types/eosio';
-import { encodeDatabaseJson } from './utils';
+import ConnectionManager from '../connections/manager.js';
+import { ShipBlock } from '../types/ship.js';
+import { eosioTimestampToDate } from '../utils/eosio.js';
+import { arrayChunk, arraysEqual } from '../utils/index.js';
+import logger from '../utils/winston.js';
+import { EosioActionTrace, EosioTransaction } from '../types/eosio.js';
+import { encodeDatabaseJson } from './utils.js';
 
 export type Condition = {
     str: string,
@@ -729,7 +728,7 @@ export class ContractDBTransaction {
     }
 }
 
-exitHook(async (callback: () => void) => {
+asyncExitHook(async (callback: () => void) => {
     logger.info('Process stopping - cleaning up transactions...');
 
     for (const transaction of ContractDB.transactions) {

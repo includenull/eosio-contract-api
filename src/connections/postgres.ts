@@ -1,7 +1,7 @@
 import { Pool, PoolClient, PoolConfig, QueryResult } from 'pg';
 // @ts-ignore
-import * as exitHook from 'async-exit-hook';
-import logger from '../utils/winston';
+import asyncExitHook from 'async-exit-hook';
+import logger from '../utils/winston.js';
 
 export default class PostgresConnection {
     readonly pool: Pool;
@@ -33,7 +33,7 @@ export default class PostgresConnection {
 
         this.initialized = true;
 
-        exitHook((callback: () => void) => this.pool.end(callback));
+        asyncExitHook((callback: () => void) => this.pool.end(callback));
     }
 
     createPool(args: Partial<PoolConfig>): Pool {

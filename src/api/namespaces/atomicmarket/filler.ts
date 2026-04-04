@@ -1,7 +1,7 @@
-import { AssetFiller } from '../atomicassets/filler';
-import { formatAsset } from '../atomicassets/format';
-import { DB } from '../../server';
-import { buildAssetFillerHook } from './format';
+import { AssetFiller } from '../atomicassets/filler.js';
+import { formatAsset } from '../atomicassets/format.js';
+import { DB } from '../../server.js';
+import { buildAssetFillerHook } from './format.js';
 
 export async function fillAuctions(db: DB, assetContract: string, auctions: any[]): Promise<any[]> {
     const assetIDs: string[] = [];

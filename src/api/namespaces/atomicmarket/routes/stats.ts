@@ -1,14 +1,14 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicMarketNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { atomicassetsComponents, greylistFilterParameters } from '../../atomicassets/openapi';
+import { AtomicMarketNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { atomicassetsComponents, greylistFilterParameters } from '../../atomicassets/openapi.js';
 import {
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters
-} from '../../../docs';
+} from '../../../docs.js';
 import {
     getAccountStatsAction,
     getAllAccountStatsAction,
@@ -18,7 +18,7 @@ import {
     getSchemaStatsByCollectionV2Action,
     getStatsGraphAction,
     getMarketStatsAction, getStatsSalesAction, getTemplateStatsAction
-} from '../handlers/stats';
+} from '../handlers/stats.js';
 
 export function statsEndpoints(core: AtomicMarketNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

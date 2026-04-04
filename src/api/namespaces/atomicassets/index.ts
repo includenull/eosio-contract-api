@@ -1,21 +1,21 @@
-import * as express from 'express';
+import express from 'express';
 
-import { ApiNamespace } from '../interfaces';
-import { HTTPServer } from '../../server';
-import { AssetApi } from './routes/assets';
-import { collectionsEndpoints } from './routes/collections';
-import { configEndpoints } from './routes/config';
-import { schemasEndpoints } from './routes/schemas';
-import { templatesEndpoints } from './routes/templates';
-import { atomicassetsComponents } from './openapi';
-import { formatAsset, formatOffer, formatTransfer } from './format';
-import { TransferApi } from './routes/transfers';
-import { OfferApi } from './routes/offers';
-import { accountsEndpoints } from './routes/accounts';
-import ApiNotificationReceiver from '../../notification';
-import { burnEndpoints } from './routes/burns';
-import { ActionHandlerContext } from '../../actionhandler';
-import {ILimits} from '../../../types/config';
+import { ApiNamespace } from '../interfaces.js';
+import { HTTPServer } from '../../server.js';
+import { AssetApi } from './routes/assets.js';
+import { collectionsEndpoints } from './routes/collections.js';
+import { configEndpoints } from './routes/config.js';
+import { schemasEndpoints } from './routes/schemas.js';
+import { templatesEndpoints } from './routes/templates.js';
+import { atomicassetsComponents } from './openapi.js';
+import { formatAsset, formatOffer, formatTransfer } from './format.js';
+import { TransferApi } from './routes/transfers.js';
+import { OfferApi } from './routes/offers.js';
+import { accountsEndpoints } from './routes/accounts.js';
+import ApiNotificationReceiver from '../../notification.js';
+import { burnEndpoints } from './routes/burns.js';
+import { ActionHandlerContext } from '../../actionhandler.js';
+import {ILimits} from '../../../types/config.js';
 
 export type AtomicAssetsNamespaceArgs = {
     connected_reader: string;

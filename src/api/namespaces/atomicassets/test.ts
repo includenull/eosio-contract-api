@@ -1,5 +1,5 @@
-import {createTxIt, TestClient} from '../../../utils/test';
-import {OfferState} from '../../../filler/handlers/atomicassets';
+import {createTxIt, TestClient} from '../../../utils/test.js';
+import {OfferState} from '../../../filler/handlers/atomicassets/index.js';
 
 export function initAtomicAssetsTest(): { client: AtomicAssetsTestClient, txit: any } {
     const client = new AtomicAssetsTestClient();

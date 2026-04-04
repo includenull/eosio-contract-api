@@ -1,11 +1,11 @@
-import { buildBoundaryFilter, RequestValues } from '../../utils';
-import { AtomicAssetsContext } from '../index';
-import QueryBuilder from '../../../builder';
-import { buildGreylistFilter } from '../utils';
-import { formatSchema } from '../format';
-import { ApiError } from '../../../error';
-import { applyActionGreylistFilters, getContractActionLogs } from '../../../utils';
-import { filterQueryArgs } from '../../validation';
+import { buildBoundaryFilter, RequestValues } from '../../utils.js';
+import { AtomicAssetsContext } from '../index.js';
+import QueryBuilder from '../../../builder.js';
+import { buildGreylistFilter } from '../utils.js';
+import { formatSchema } from '../format.js';
+import { ApiError } from '../../../error.js';
+import { applyActionGreylistFilters, getContractActionLogs } from '../../../utils.js';
+import { filterQueryArgs } from '../../validation.js';
 
 export async function getSchemasAction(params: RequestValues, ctx: AtomicAssetsContext): Promise<any> {
     const maxLimit = ctx.coreArgs.limits?.schemas || 1000;

@@ -1,7 +1,7 @@
-import { ApiNamespace } from './interfaces';
-import { AtomicAssetsNamespace } from './atomicassets';
-import { AtomicMarketNamespace } from './atomicmarket';
-import { AtomicToolsNamespace } from './atomictools';
+import { ApiNamespace } from './interfaces.js';
+import { AtomicAssetsNamespace } from './atomicassets/index.js';
+import { AtomicMarketNamespace } from './atomicmarket/index.js';
+import { AtomicToolsNamespace } from './atomictools/index.js';
 
 export const namespaces: (typeof ApiNamespace)[] = [
     AtomicAssetsNamespace,

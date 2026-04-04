@@ -1,24 +1,26 @@
 import * as os from 'os';
 
 import * as cluster from 'cluster';
-import * as express from 'express';
+import express from 'express';
 
-import Filler from '../filler/filler';
-import ConnectionManager from '../connections/manager';
-import logger from '../utils/winston';
-import {IConnectionsConfig, IReaderConfig} from '../types/config';
-import {upgradeDb} from '../filler/upgrade-db';
-import {MetricsCollectorHandler} from '../metrics/handler';
+import Filler from '../filler/filler.js';
+import ConnectionManager from '../connections/manager.js';
+import logger from '../utils/winston.js';
+import {IConnectionsConfig, IReaderConfig} from '../types/config.js';
+import {upgradeDb} from '../filler/upgrade-db.js';
+import {MetricsCollectorHandler} from '../metrics/handler.js';
 import {Registry} from 'prom-client';
-import {setAutoVacSettings} from '../filler/set-autovac-settings';
+import {setAutoVacSettings} from '../filler/set-autovac-settings.js';
+import { createRequire } from 'node:module';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const require = createRequire(import.meta.url);
+
 const readerConfigs: IReaderConfig[] = require('../../config/readers.config.json');
 
 let connectionConfig: IConnectionsConfig = {postgres: {}, redis: {}, chain: {}} as IConnectionsConfig;
 
 try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     connectionConfig = require('../../config/connections.config.json');
 } catch {
     logger.warn('No connections.config.json found. Falling back to environment variables');

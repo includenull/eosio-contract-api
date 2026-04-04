@@ -1,8 +1,6 @@
-import 'mocha';
-import {expect} from 'chai';
-import {initAtomicMarketTest} from '../test';
-import {getUsersInventoryPrices} from './prices';
-import {getTestContext} from '../../../../utils/test';
+import {initAtomicMarketTest} from '../test.js';
+import {getUsersInventoryPrices} from './prices.js';
+import {getTestContext} from '../../../../utils/test.js';
 
 const {client, txit} = initAtomicMarketTest();
 
@@ -22,7 +20,7 @@ describe('AtomicMarket Prices API', () => {
                 },
                 db: getTestContext(client).db,
             });
-            expect(response.collections).to.deep.equal([]);
+            expect(response.collections).toEqual([]);
         });
 
         txit('has data', async () => {
@@ -151,21 +149,21 @@ describe('AtomicMarket Prices API', () => {
 
             const response = await getUsersInventoryPrices({}, getTestContext(client, {account}));
 
-            expect(response.collections.find((i: any) => i.collection.collection_name === asset3.collection_name).prices.length).to.be.equal(1);
-            expect(response.collections.find((i: any) => i.collection.collection_name === asset3.collection_name).prices[0]).to.deep.contain({
+            expect(response.collections.find((i: any) => i.collection.collection_name === asset3.collection_name).prices.length).toBe(1);
+            expect(response.collections.find((i: any) => i.collection.collection_name === asset3.collection_name).prices[0]).toMatchObject({
                 median: '8',
                 average: '10',
                 min: '8',
                 max: '12'
             });
-            expect(response.collections.find((i: any) => i.collection.collection_name === asset1.collection_name).prices.length).to.be.equal(2);
-            expect(response.collections.find((i: any) => i.collection.collection_name === asset1.collection_name).prices.find((x) => x.token_symbol === token.token_symbol)).to.deep.contain({
+            expect(response.collections.find((i: any) => i.collection.collection_name === asset1.collection_name).prices.length).toBe(2);
+            expect(response.collections.find((i: any) => i.collection.collection_name === asset1.collection_name).prices.find((x) => x.token_symbol === token.token_symbol)).toMatchObject({
                 median: '20',
                 average: '30',
                 min: '20',
                 max: '40',
             });
-            expect(response.collections.find((i: any) => i.collection.collection_name === asset6.collection_name).prices.find((x) => x.token_symbol === token2.token_symbol)).to.deep.contain({
+            expect(response.collections.find((i: any) => i.collection.collection_name === asset6.collection_name).prices.find((x) => x.token_symbol === token2.token_symbol)).toMatchObject({
                 median: '16',
                 average: '16',
                 min: '16',
@@ -174,5 +172,5 @@ describe('AtomicMarket Prices API', () => {
         });
     });
 
-    after(async () => await client.end());
+    afterAll(async () => await client.end());
 });

@@ -1,8 +1,7 @@
-import {expect} from 'chai';
-import {initAtomicMarketTest} from '../test';
-import {RequestValues} from '../../utils';
-import {getTestContext} from '../../../../utils/test';
-import {getTemplateBuyOffersAction} from './template-buyoffers';
+import {initAtomicMarketTest} from '../test.js';
+import {RequestValues} from '../../utils.js';
+import {getTestContext} from '../../../../utils/test.js';
+import {getTemplateBuyOffersAction} from './template-buyoffers.js';
 
 // TODO add more tests
 describe('template buy offer handler', () => {
@@ -55,12 +54,12 @@ describe('template buy offer handler', () => {
             });
 
             expect(await getBuyOffersIds({sort: 'name', order: 'asc'}))
-                .to.deep.equal([buyOffer2.buyoffer_id, buyOffer3.buyoffer_id, buyOffer1.buyoffer_id]);
+                .toEqual([buyOffer2.buyoffer_id, buyOffer3.buyoffer_id, buyOffer1.buyoffer_id]);
         });
 
     });
 
-    after(async () => {
+    afterAll(async () => {
         await client.end();
     });
 });

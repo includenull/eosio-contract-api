@@ -1,4 +1,4 @@
-import { Numeric } from 'eosjs/dist';
+import { Numeric } from 'eosjs/dist/index.js';
 
 export function formatLink(row: any): any {
     const data = {...row};

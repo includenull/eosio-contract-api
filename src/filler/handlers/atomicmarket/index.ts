@@ -1,24 +1,24 @@
 import * as fs from 'fs';
 import { PoolClient } from 'pg';
 
-import { ContractHandler } from '../interfaces';
-import logger from '../../../utils/winston';
-import { ConfigTableRow } from './types/tables';
-import Filler  from '../../filler';
-import { DELPHIORACLE_BASE_PRIORITY } from '../delphioracle';
-import { ATOMICASSETS_BASE_PRIORITY } from '../atomicassets';
-import DataProcessor from '../../processor';
-import ApiNotificationSender from '../../notifier';
-import { auctionProcessor } from './processors/auctions';
-import { balanceProcessor } from './processors/balances';
-import { configProcessor } from './processors/config';
-import { logProcessor } from './processors/logs';
-import { marketplaceProcessor } from './processors/marketplaces';
-import { saleProcessor } from './processors/sales';
-import { buyofferProcessor } from './processors/buyoffers';
-import { bonusfeeProcessor } from './processors/bonusfees';
-import { JobQueuePriority } from '../../jobqueue';
-import { templateBuyofferProcessor } from './processors/template-buyoffers';
+import { ContractHandler } from '../interfaces.js';
+import logger from '../../../utils/winston.js';
+import { ConfigTableRow } from './types/tables.js';
+import Filler  from '../../filler.js';
+import { DELPHIORACLE_BASE_PRIORITY } from '../delphioracle/index.js';
+import { ATOMICASSETS_BASE_PRIORITY } from '../atomicassets/index.js';
+import DataProcessor from '../../processor.js';
+import ApiNotificationSender from '../../notifier.js';
+import { auctionProcessor } from './processors/auctions.js';
+import { balanceProcessor } from './processors/balances.js';
+import { configProcessor } from './processors/config.js';
+import { logProcessor } from './processors/logs.js';
+import { marketplaceProcessor } from './processors/marketplaces.js';
+import { saleProcessor } from './processors/sales.js';
+import { buyofferProcessor } from './processors/buyoffers.js';
+import { bonusfeeProcessor } from './processors/bonusfees.js';
+import { JobQueuePriority } from '../../jobqueue.js';
+import { templateBuyofferProcessor } from './processors/template-buyoffers.js';
 
 export const ATOMICMARKET_BASE_PRIORITY = Math.max(ATOMICASSETS_BASE_PRIORITY, DELPHIORACLE_BASE_PRIORITY) + 1000;
 

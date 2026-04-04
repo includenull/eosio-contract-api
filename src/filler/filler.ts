@@ -1,13 +1,13 @@
-import ConnectionManager from '../connections/manager';
-import StateReceiver from './receiver';
-import logger from '../utils/winston';
-import { IReaderConfig } from '../types/config';
-import { formatSecondsLeft } from '../utils/time';
-import { getHandlers } from './handlers';
-import { ContractHandler } from './handlers/interfaces';
-import { ModuleLoader } from './modules';
-import { JobQueue } from './jobqueue';
-import ListPoller from './list-poller';
+import ConnectionManager from '../connections/manager.js';
+import StateReceiver from './receiver.js';
+import logger from '../utils/winston.js';
+import { IReaderConfig } from '../types/config.js';
+import { formatSecondsLeft } from '../utils/time.js';
+import { getHandlers } from './handlers/index.js';
+import { ContractHandler } from './handlers/interfaces.js';
+import { ModuleLoader } from './modules.js';
+import { JobQueue } from './jobqueue.js';
+import ListPoller from './list-poller.js';
 
 function estimateSeconds(blocks: number, speed: number, depth: number = 0): number {
     if (blocks <= 2) {
@@ -36,7 +36,7 @@ export default class Filler {
 
     private readonly handlers: ContractHandler[];
 
-    private readonly listPollers: ListPoller[] = []
+    private readonly listPollers: ListPoller[] = [];
 
     constructor(private readonly config: IReaderConfig, readonly connection: ConnectionManager) {
         this.handlers = getHandlers(config.contracts, this);

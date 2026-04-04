@@ -1,30 +1,30 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicMarketNamespace, TemplateBuyofferApiState } from '../index';
-import { HTTPServer } from '../../../server';
-import { formatTemplateBuyoffer } from '../format';
-import { fillTemplateBuyoffers } from '../filler';
+import { AtomicMarketNamespace, TemplateBuyofferApiState } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { formatTemplateBuyoffer } from '../format.js';
+import { fillTemplateBuyoffers } from '../filler.js';
 import {
     actionGreylistParameters,
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { extendedAssetFilterParameters, atomicDataFilter, baseAssetFilterParameters } from '../../atomicassets/openapi';
-import { listingFilterParameters } from '../openapi';
+} from '../../../docs.js';
+import { extendedAssetFilterParameters, atomicDataFilter, baseAssetFilterParameters } from '../../atomicassets/openapi.js';
+import { listingFilterParameters } from '../openapi.js';
 import {
     createSocketApiNamespace,
     extractNotificationIdentifiers,
-} from '../../../utils';
-import ApiNotificationReceiver from '../../../notification';
-import { NotificationData } from '../../../../filler/notifier';
+} from '../../../utils.js';
+import ApiNotificationReceiver from '../../../notification.js';
+import { NotificationData } from '../../../../filler/notifier.js';
 import {
     getTemplateBuyOfferAction,
     getTemplateBuyOfferLogsAction,
     getTemplateBuyOffersAction,
     getTemplateBuyOffersCountAction
-} from '../handlers/template-buyoffers';
+} from '../handlers/template-buyoffers.js';
 
 export function templateBuyoffersEndpoints(core: AtomicMarketNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

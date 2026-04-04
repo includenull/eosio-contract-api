@@ -1,6 +1,6 @@
-import { AssetFiller } from '../atomicassets/filler';
-import { formatAsset } from '../atomicassets/format';
-import { DB } from '../../server';
+import { AssetFiller } from '../atomicassets/filler.js';
+import { formatAsset } from '../atomicassets/format.js';
+import { DB } from '../../server.js';
 
 export async function fillLinks(db: DB, assetContract: string, links: any[]): Promise<any[]> {
     const assetIDs: string[] = [];

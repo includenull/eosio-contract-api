@@ -1,10 +1,9 @@
 import * as os from 'os';
 
-import {connectionConfig} from '../utils/test';
-import {MetricsCollectorHandler} from './handler';
+import {connectionConfig} from '../utils/test.js';
+import {MetricsCollectorHandler} from './handler.js';
 import {Registry} from 'prom-client';
-import ConnectionManager from '../connections/manager';
-import {expect} from 'chai';
+import ConnectionManager from '../connections/manager.js';
 
 describe('FillerMetricCollector', () => {
     const connections = new ConnectionManager({
@@ -16,7 +15,7 @@ describe('FillerMetricCollector', () => {
     });
 
 
-    before(async () => {
+    beforeAll(async () => {
         await connections.connect();
     });
 
@@ -34,7 +33,7 @@ describe('FillerMetricCollector', () => {
         ];
         const res = await handler.getMetrics(new Registry());
 
-        expect(metrics.every(s => res.includes(s))).to.be.true;
+        expect(metrics.every(s => res.includes(s))).toBe(true);
     });
 
     it('skips the metrics using the collect from option', async () => {
@@ -54,11 +53,11 @@ describe('FillerMetricCollector', () => {
         ];
         const res = await handler.getMetrics(new Registry());
 
-        expect(metrics.every(s => !res.includes(s))).to.be.true;
-        expect(res.includes('eos_contract_api_sql_live')).to.be.true;
+        expect(metrics.every(s => !res.includes(s))).toBe(true);
+        expect(res.includes('eos_contract_api_sql_live')).toBe(true);
     });
 
-    after(async () => {
+    afterAll(async () => {
         await connections.disconnect();
     });
 });

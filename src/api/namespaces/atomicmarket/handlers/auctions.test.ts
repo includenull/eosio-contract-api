@@ -1,9 +1,8 @@
-import {expect} from 'chai';
 
-import {initAtomicMarketTest} from '../test';
-import {RequestValues} from '../../utils';
-import {getTestContext} from '../../../../utils/test';
-import {getAuctionsAction} from './auctions';
+import {initAtomicMarketTest} from '../test.js';
+import {RequestValues} from '../../utils.js';
+import {getTestContext} from '../../../../utils/test.js';
+import {getAuctionsAction} from './auctions.js';
 
 // TODO add more tests
 describe('auction handler', () => {
@@ -19,7 +18,7 @@ describe('auction handler', () => {
 
     describe('getAuctions', () => {
         txit('returns empty on no auctions', async () => {
-            expect(await getAuctionsIds({})).to.deep.equal([]);
+            expect(await getAuctionsIds({})).toEqual([]);
         });
 
         txit('returns all auctions without filters', async () => {
@@ -27,10 +26,10 @@ describe('auction handler', () => {
             const auction2 = await client.createAuction();
 
             expect((await getAuctionsIds({})).sort())
-                .to.deep.equal([auction.auction_id, auction2.auction_id].sort());
+                .toEqual([auction.auction_id, auction2.auction_id].sort());
         });
 
-        context('with template_blacklist args', () => {
+        describe('with template_blacklist args', () => {
             txit('filter out auctions the given template matching the blacklist', async () => {
                 const auction = await client.createAuction();
                 const asset = await client.createAsset({
@@ -52,7 +51,7 @@ describe('auction handler', () => {
                 });
 
                 expect(await getAuctionsIds({template_blacklist: [asset2.template_id].join(',')}))
-                    .to.deep.equal([auction.auction_id]);
+                    .toEqual([auction.auction_id]);
             });
         });
 
@@ -89,12 +88,12 @@ describe('auction handler', () => {
             });
 
             expect(await getAuctionsIds({sort: 'name', order: 'asc'}))
-                .to.deep.equal([auction2.auction_id, auction3.auction_id, auction1.auction_id]);
+                .toEqual([auction2.auction_id, auction3.auction_id, auction1.auction_id]);
         });
 
     });
 
-    after(async () => {
+    afterAll(async () => {
         await client.end();
     });
 });

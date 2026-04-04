@@ -1,8 +1,8 @@
-import ConnectionManager from '../../connections/manager';
-import { INamespaceConfig } from '../../types/config';
-import { ApiNamespace } from './interfaces';
+import ConnectionManager from '../../connections/manager.js';
+import { INamespaceConfig } from '../../types/config.js';
+import { ApiNamespace } from './interfaces.js';
 
-import { namespaces } from './loader';
+import { namespaces } from './loader.js';
 
 export function getNamespaces(
     configs: INamespaceConfig[], connection: ConnectionManager

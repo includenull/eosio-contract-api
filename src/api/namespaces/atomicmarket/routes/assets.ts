@@ -1,21 +1,21 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicMarketNamespace } from '../index';
-import { HTTPServer } from '../../../server';
+import { AtomicMarketNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
 import {
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
+} from '../../../docs.js';
 import {
     extendedAssetFilterParameters,
     atomicDataFilter,
     greylistFilterParameters,
     hideOffersParameters,
     baseAssetFilterParameters, completeAssetFilterParameters
-} from '../../atomicassets/openapi';
-import { getMarketAssetsAction, getMarketAssetsCountAction } from '../handlers/assets';
+} from '../../atomicassets/openapi.js';
+import { getMarketAssetsAction, getMarketAssetsCountAction } from '../handlers/assets.js';
 
 export function assetsEndpoints(core: AtomicMarketNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

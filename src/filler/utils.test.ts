@@ -1,7 +1,5 @@
-import 'mocha';
-import {expect} from 'chai';
 
-import {encodeDatabaseJson} from './utils';
+import {encodeDatabaseJson} from './utils.js';
 
 describe('utils', () => {
     describe('encodeDatabaseJson', () => {
@@ -10,7 +8,7 @@ describe('utils', () => {
                 a: '\u0000',
                 b: 'b',
                 c: 1,
-            })).to.equal(JSON.stringify({
+            })).toBe(JSON.stringify({
                 a: ' ',
                 b: 'b',
                 c: 1,

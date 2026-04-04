@@ -1,19 +1,19 @@
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import AtomicMarketHandler, { AtomicMarketUpdatePriority, AuctionState } from '../index';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import AtomicMarketHandler, { AtomicMarketUpdatePriority, AuctionState } from '../index.js';
 import {
     AuctionBidActionData,
     AuctionClaimBuyerActionData, AuctionClaimSellerActionData,
     CancelAuctionActionData,
     LogAuctionStartActionData,
     LogNewAuctionActionData
-} from '../types/actions';
-import { preventInt64Overflow } from '../../../../utils/binary';
-import ApiNotificationSender from '../../../notifier';
-import { AuctionsTableRow } from '../types/tables';
+} from '../types/actions.js';
+import { preventInt64Overflow } from '../../../../utils/binary.js';
+import ApiNotificationSender from '../../../notifier.js';
+import { AuctionsTableRow } from '../types/tables.js';
 
 export function auctionProcessor(core: AtomicMarketHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

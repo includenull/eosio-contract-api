@@ -1,10 +1,10 @@
-import * as express from 'express';
+import express from 'express';
 
-import { ApiNamespace } from './namespaces/interfaces';
-import { HTTPServer } from './server';
-import { IServerConfig } from '../types/config';
-import ConnectionManager from '../connections/manager';
-import { getNamespaces } from './namespaces';
+import { ApiNamespace } from './namespaces/interfaces.js';
+import { HTTPServer } from './server.js';
+import { IServerConfig } from '../types/config.js';
+import ConnectionManager from '../connections/manager.js';
+import { getNamespaces } from './namespaces/index.js';
 
 export default class Api {
     private readonly namespaces: ApiNamespace[];
@@ -24,7 +24,7 @@ export default class Api {
 
         this.server.docs.render();
 
-        this.server.web.express.use('*', (_: express.Request, res: express.Response) => {
+        this.server.web.express.use((_: express.Request, res: express.Response) => {
             res.status(404).json({
                 success: false, message: 'Endpoint not found'
             });

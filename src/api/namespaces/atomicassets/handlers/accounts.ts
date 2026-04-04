@@ -1,12 +1,12 @@
 import {oneLine} from 'common-tags';
-import {IAccountCollectionStats} from 'atomicassets/build/API/Explorer/Objects';
-import {buildBoundaryFilter, RequestValues} from '../../utils';
-import {AtomicAssetsContext} from '../index';
-import QueryBuilder from '../../../builder';
-import { buildAssetFilter, buildGreylistFilter, buildHideOffersFilter } from '../utils';
-import {filterQueryArgs} from '../../validation';
+import {IAccountCollectionStats} from 'atomicassets/build/API/Explorer/Objects.js';
+import {buildBoundaryFilter, RequestValues} from '../../utils.js';
+import {AtomicAssetsContext} from '../index.js';
+import QueryBuilder from '../../../builder.js';
+import { buildAssetFilter, buildGreylistFilter, buildHideOffersFilter } from '../utils.js';
+import {filterQueryArgs} from '../../validation.js';
 
-export {getAccountAction} from './accounts/getAccountAction';
+export {getAccountAction} from './accounts/getAccountAction.js';
 
 // TODO: Separate the logic of building query to reuse it on getAccountsCountAction
 /**

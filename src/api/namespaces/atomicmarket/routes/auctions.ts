@@ -1,26 +1,26 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicMarketNamespace, AuctionApiState } from '../index';
-import { HTTPServer } from '../../../server';
-import { formatAuction } from '../format';
-import { fillAuctions } from '../filler';
+import { AtomicMarketNamespace, AuctionApiState } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { formatAuction } from '../format.js';
+import { fillAuctions } from '../filler.js';
 import {
     actionGreylistParameters,
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { extendedAssetFilterParameters, atomicDataFilter, baseAssetFilterParameters } from '../../atomicassets/openapi';
-import { listingFilterParameters } from '../openapi';
+} from '../../../docs.js';
+import { extendedAssetFilterParameters, atomicDataFilter, baseAssetFilterParameters } from '../../atomicassets/openapi.js';
+import { listingFilterParameters } from '../openapi.js';
 import {
     createSocketApiNamespace,
     extractNotificationIdentifiers,
-} from '../../../utils';
-import ApiNotificationReceiver from '../../../notification';
-import { NotificationData } from '../../../../filler/notifier';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import { getAuctionAction, getAuctionLogsAction, getAuctionsAction, getAuctionsCountAction } from '../handlers/auctions';
+} from '../../../utils.js';
+import ApiNotificationReceiver from '../../../notification.js';
+import { NotificationData } from '../../../../filler/notifier.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import { getAuctionAction, getAuctionLogsAction, getAuctionsAction, getAuctionsCountAction } from '../handlers/auctions.js';
 
 export function auctionsEndpoints(core: AtomicMarketNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

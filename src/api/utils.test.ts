@@ -1,9 +1,7 @@
-import 'mocha';
-import {expect} from 'chai';
 
-import {applyActionGreylistFilters, extractNotificationIdentifiers, respondApiError} from './utils';
-import {NotificationData} from '../filler/notifier';
-import {ApiError} from './error';
+import {applyActionGreylistFilters, extractNotificationIdentifiers, respondApiError} from './utils.js';
+import {NotificationData} from '../filler/notifier.js';
+import {ApiError} from './error.js';
 
 describe('utils', () => {
     describe('ApplyActionGreyListFilters', () => {
@@ -12,12 +10,12 @@ describe('utils', () => {
 
         it('applies both white and black list filters on the actions', () => {
             expect(applyActionGreylistFilters(['a', 'b', 'c', 'd', 'e', 'f'], {action_blacklist, action_whitelist}))
-                .to.deep.equal(['a', 'b']);
+                .toEqual(['a', 'b']);
         });
 
         it('handles an empty action_whitelist', () => {
             expect(applyActionGreylistFilters(['a', 'b', 'c', 'd', 'e', 'f'], {action_blacklist, action_whitelist: []}))
-                .to.deep.equal(['a', 'b', 'f']);
+                .toEqual(['a', 'b', 'f']);
         });
     });
 
@@ -47,12 +45,12 @@ describe('utils', () => {
 
         it('extracts the notifications of type delta given key', () => {
             expect(extractNotificationIdentifiers([deltaNotification], key))
-                .to.deep.equal(['deltaNotificationVal']);
+                .toEqual(['deltaNotificationVal']);
         });
 
         it('extracts the notifications of type trace given key', () => {
             expect(extractNotificationIdentifiers([traceNotification], key))
-                .to.deep.equal(['traceNotificationVal']);
+                .toEqual(['traceNotificationVal']);
         });
 
         it('ignores trace notification when no trace information is present', () => {
@@ -63,12 +61,12 @@ describe('utils', () => {
                 } as any,
             };
             expect(extractNotificationIdentifiers([emptyTrace], key))
-                .to.deep.equal([]);
+                .toEqual([]);
         });
 
         it('ignores repeated identifiers', () => {
             expect(extractNotificationIdentifiers([deltaNotification, deltaNotification], key))
-                .to.deep.equal(['deltaNotificationVal']);
+                .toEqual(['deltaNotificationVal']);
         });
     });
 
@@ -103,16 +101,16 @@ describe('utils', () => {
             const mockResponse = createMockResponse();
             respondApiError(mockResponse as any, new Error('Unhandled error'));
             const returnedStatus = mockResponse.statusCalled[0];
-            expect(returnedStatus).to.equal(500);
+            expect(returnedStatus).toBe(500);
         });
 
         it('on api error handled error, shows the message and the code of the error', () => {
             const mockResponse = createMockResponse();
             respondApiError(mockResponse as any, apiError);
             const returnedStatus = mockResponse.statusCalled[0];
-            expect(returnedStatus).to.deep.equal(apiError.code);
+            expect(returnedStatus).toEqual(apiError.code);
             const responseBody = mockResponse.jsonCalled[0];
-            expect(responseBody).to.deep.equal({success: false, message: apiError.message});
+            expect(responseBody).toEqual({success: false, message: apiError.message});
         });
 
         it('on api error handled error, skip on sensitive information', () => {
@@ -120,7 +118,7 @@ describe('utils', () => {
             const noMessageShow = {...apiError, showMessage: false};
             respondApiError(mockResponse as any, noMessageShow);
             const returnedStatus = mockResponse.statusCalled[0];
-            expect(returnedStatus).to.equal(500);
+            expect(returnedStatus).toBe(500);
         });
     });
 });

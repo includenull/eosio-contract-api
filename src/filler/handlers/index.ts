@@ -1,8 +1,8 @@
-import { IContractConfig } from '../../types/config';
-import { ContractHandler } from './interfaces';
+import { IContractConfig } from '../../types/config.js';
+import { ContractHandler } from './interfaces.js';
 
-import { handlers } from './loader';
-import Filler from '../filler';
+import { handlers } from './loader.js';
+import Filler from '../filler.js';
 
 export function getHandlers(configs: IContractConfig[], filler: Filler): ContractHandler[] {
     const configHandlers = [];

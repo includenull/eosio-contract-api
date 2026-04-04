@@ -1,13 +1,11 @@
-import 'mocha';
-import {expect} from 'chai';
-import {getSalesAction} from './sales';
-import {SaleApiState} from '../index';
-import {OfferState} from '../../../../filler/handlers/atomicassets';
-import {SaleState} from '../../../../filler/handlers/atomicmarket';
-import {ApiError} from '../../../error';
-import {RequestValues} from '../../utils';
-import {initAtomicMarketTest} from '../test';
-import {getTestContext} from '../../../../utils/test';
+import {getSalesAction} from './sales.js';
+import {SaleApiState} from '../index.js';
+import {OfferState} from '../../../../filler/handlers/atomicassets/index.js';
+import {SaleState} from '../../../../filler/handlers/atomicmarket/index.js';
+import {ApiError} from '../../../error.js';
+import {RequestValues} from '../../utils.js';
+import {initAtomicMarketTest} from '../test.js';
+import {getTestContext} from '../../../../utils/test.js';
 
 const {client, txit} = initAtomicMarketTest();
 
@@ -25,10 +23,10 @@ describe('AtomicMarket Sales API', () => {
         txit('works without filters', async () => {
             const {sale_id} = await client.createSale();
 
-            expect(await getSalesIds({})).to.deep.equal([sale_id]);
+            expect(await getSalesIds({})).toEqual([sale_id]);
         });
 
-        context('with template_blacklist args', () => {
+        describe('with template_blacklist args', () => {
             txit('filter out the given template matching the blacklist', async () => {
                 //Included
                 const templateIncluded = await client.createTemplate();
@@ -56,7 +54,7 @@ describe('AtomicMarket Sales API', () => {
 
                 expect((await getSalesIds({
                     template_blacklist: [templateExcluded1.template_id, templateExcluded2.template_id].join(',')
-                })).sort()).to.deep.equal([sale_id, sale_id4].sort());
+                })).sort()).toEqual([sale_id, sale_id4].sort());
             });
         });
 
@@ -68,7 +66,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({state: `${SaleApiState.WAITING}`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by listed state', async () => {
@@ -89,7 +87,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({state: `${SaleApiState.LISTED}`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by canceled state', async () => {
@@ -99,7 +97,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({state: `${SaleApiState.CANCELED}`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by sold state', async () => {
@@ -109,7 +107,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({state: `${SaleApiState.SOLD}`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by invalid state', async () => {
@@ -130,7 +128,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({state: `${SaleApiState.INVALID}`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by multiple states', async () => {
@@ -145,7 +143,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({state: `${SaleApiState.WAITING},${SaleApiState.CANCELED}`}))
-                .to.deep.equal([sale_id2, sale_id1]);
+                .toEqual([sale_id2, sale_id1]);
         });
 
         txit('filters by minimum asset count', async () => {
@@ -155,7 +153,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({min_assets: '1'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by maximum asset count', async () => {
@@ -165,7 +163,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale();
 
             expect(await getSalesIds({max_assets: '1'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by settlement symbol', async () => {
@@ -174,7 +172,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale();
 
             expect(await getSalesIds({symbol: 'TEST'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by minimum price', async () => {
@@ -185,8 +183,8 @@ describe('AtomicMarket Sales API', () => {
                 err = e;
             }
 
-            expect(err).to.be.instanceof(ApiError);
-            expect(err.message).to.equal('Price filters are removed in /v1/sales, use /v2/sales');
+            expect(err).toBeInstanceOf(ApiError);
+            expect((err as ApiError).message).toBe('Price filters are removed in /v1/sales, use /v2/sales');
         });
 
         txit('filters by maximum price', async () => {
@@ -197,8 +195,8 @@ describe('AtomicMarket Sales API', () => {
                 err = e;
             }
 
-            expect(err).to.be.instanceof(ApiError);
-            expect(err.message).to.equal('Price filters are removed in /v1/sales, use /v2/sales');
+            expect(err).toBeInstanceOf(ApiError);
+            expect((err as ApiError).message).toBe('Price filters are removed in /v1/sales, use /v2/sales');
         });
 
         txit('filters out seller contracts unless whitelisted', async () => {
@@ -217,7 +215,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({show_seller_contracts: 'false', contract_whitelist: 'whitelisted,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by blacklisted sellers', async () => {
@@ -228,7 +226,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({});
 
             expect(await getSalesIds({seller_blacklist: 'blacklisted,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by blacklisted buyers', async () => {
@@ -239,7 +237,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({});
 
             expect(await getSalesIds({buyer_blacklist: 'blacklisted,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by accounts', async () => {
@@ -249,7 +247,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale({seller: 'x'});
 
             expect(await getSalesIds({account: 'x,abc'}))
-                .to.deep.equal([sale_id2, sale_id1]);
+                .toEqual([sale_id2, sale_id1]);
         });
 
         txit('filters by seller', async () => {
@@ -258,7 +256,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({seller: 'x'});
 
             expect(await getSalesIds({seller: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by buyer', async () => {
@@ -267,7 +265,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({buyer: 'x'});
 
             expect(await getSalesIds({buyer: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by maker marketplace', async () => {
@@ -276,7 +274,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({maker_marketplace: 'x'});
 
             expect(await getSalesIds({maker_marketplace: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by taker marketplace', async () => {
@@ -285,7 +283,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({taker_marketplace: 'x'});
 
             expect(await getSalesIds({taker_marketplace: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by maker or taker marketplace', async () => {
@@ -295,7 +293,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale({taker_marketplace: 'x'});
 
             expect(await getSalesIds({marketplace: 'x,abc'}))
-                .to.deep.equal([sale_id2, sale_id1]);
+                .toEqual([sale_id2, sale_id1]);
         });
 
         txit('filters by collection', async () => {
@@ -305,7 +303,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({collection_name});
 
             expect(await getSalesIds({collection_name: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by minimum and maximum template mint', async () => {
@@ -316,7 +314,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({template_mint: '[5,5]'});
 
             expect(await getSalesIds({min_template_mint: '4', max_template_mint: '6'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset_id', async () => {
@@ -327,7 +325,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({asset_id}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset owner', async () => {
@@ -338,7 +336,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({owner: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset burned', async () => {
@@ -349,7 +347,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({burned: 'true'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset not burned', async () => {
@@ -360,7 +358,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({burned: 'false'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset template', async () => {
@@ -374,7 +372,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({template_id: `${template_id},-1`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by not having an asset template', async () => {
@@ -387,7 +385,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({template_id: 'null'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by schema', async () => {
@@ -399,7 +397,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({schema_name: `${schema_name},z`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset being transferable', async () => {
@@ -413,7 +411,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({is_transferable: 'true'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset not being transferable', async () => {
@@ -427,7 +425,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({is_transferable: 'false'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset being burnable', async () => {
@@ -441,7 +439,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({is_burnable: 'true'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by asset not being burnable', async () => {
@@ -455,7 +453,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({is_burnable: 'false'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by text data', async () => {
@@ -467,7 +465,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'data:text.prop': 'TheValue'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by number template_data', async () => {
@@ -479,7 +477,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'template_data:number.prop': 1}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by bool mutable_data', async () => {
@@ -490,7 +488,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'mutable_data:bool.prop': 'true'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by untyped immutable_data', async () => {
@@ -501,7 +499,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'immutable_data.prop': 'this'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by match_immutable_name', async () => {
@@ -512,7 +510,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'match_immutable_name': 'par%_tial'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by match_mutable_name', async () => {
@@ -523,7 +521,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'match_mutable_name': 'par%_tial'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by match (template name)', async () => {
@@ -535,7 +533,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({offer_id});
 
             expect(await getSalesIds({'match': 'par%_tial'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by collection_whitelist', async () => {
@@ -545,7 +543,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale({collection_name});
 
             expect(await getSalesIds({collection_whitelist: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by collection_blacklist', async () => {
@@ -555,7 +553,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale();
 
             expect(await getSalesIds({collection_blacklist: 'x,abc'}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by id (sale_id)', async () => {
@@ -564,7 +562,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id} = await client.createSale();
 
             expect(await getSalesIds({ids: `${sale_id},-1`}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by id range (sale_id)', async () => {
@@ -578,7 +576,7 @@ describe('AtomicMarket Sales API', () => {
             await client.createSale();
 
             expect(await getSalesIds({lower_bound, upper_bound}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('filters by date range', async () => {
@@ -592,7 +590,7 @@ describe('AtomicMarket Sales API', () => {
             await client.createSale();
 
             expect(await getSalesIds({after, before}))
-                .to.deep.equal([sale_id]);
+                .toEqual([sale_id]);
         });
 
         txit('returns count', async () => {
@@ -604,7 +602,7 @@ describe('AtomicMarket Sales API', () => {
 
             const result = await getSalesAction({ids: `${sale_id}`, count: 'true'}, testContext);
 
-            expect(result).to.equal('1');
+            expect(result).toBe('1');
         });
 
         txit('orders ascending', async () => {
@@ -613,7 +611,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale();
 
             expect(await getSalesIds({order: 'asc'}))
-                .to.deep.equal([sale_id1, sale_id2]);
+                .toEqual([sale_id1, sale_id2]);
         });
 
         txit('orders descending', async () => {
@@ -622,7 +620,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale();
 
             expect(await getSalesIds({order: 'desc'}))
-                .to.deep.equal([sale_id2, sale_id1]);
+                .toEqual([sale_id2, sale_id1]);
         });
 
         txit('orders by sale_id', async () => {
@@ -632,7 +630,7 @@ describe('AtomicMarket Sales API', () => {
             await client.createSale({sale_id: sale_id2, created_at_time: sale_id2});
 
             expect(await getSalesIds({sort: 'sale_id'}))
-                .to.deep.equal([sale_id1, sale_id2]);
+                .toEqual([sale_id1, sale_id2]);
         });
 
         txit('orders by created', async () => {
@@ -642,7 +640,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale({created_at_time});
 
             expect(await getSalesIds({sort: 'created'}))
-                .to.deep.equal([sale_id1, sale_id2]);
+                .toEqual([sale_id1, sale_id2]);
         });
 
         txit('orders by updated', async () => {
@@ -652,7 +650,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale({updated_at_time});
 
             expect(await getSalesIds({sort: 'updated'}))
-                .to.deep.equal([sale_id1, sale_id2]);
+                .toEqual([sale_id1, sale_id2]);
         });
 
         txit('orders by price', async () => {
@@ -663,8 +661,8 @@ describe('AtomicMarket Sales API', () => {
                 err = e;
             }
 
-            expect(err).to.be.instanceof(ApiError);
-            expect(err.message).to.equal('Sorting by price removed in /v1/sales, use /v2/sales');
+            expect(err).toBeInstanceOf(ApiError);
+            expect((err as ApiError).message).toBe('Sorting by price removed in /v1/sales, use /v2/sales');
         });
 
         txit('orders by template_mint', async () => {
@@ -673,7 +671,7 @@ describe('AtomicMarket Sales API', () => {
             const {sale_id: sale_id2} = await client.createSale({template_mint: '[1,2)'});
 
             expect(await getSalesIds({sort: 'template_mint'}))
-                .to.deep.equal([sale_id1, sale_id2]);
+                .toEqual([sale_id1, sale_id2]);
         });
 
         txit('orders by template_mint', async () => {
@@ -691,7 +689,7 @@ describe('AtomicMarket Sales API', () => {
             });
 
             expect(await getSalesIds({sort: 'name', order: 'asc'}))
-                .to.deep.equal([sale_id2, sale_id1, sale_id3]);
+                .toEqual([sale_id2, sale_id1, sale_id3]);
         });
 
         txit('paginates', async () => {
@@ -700,7 +698,7 @@ describe('AtomicMarket Sales API', () => {
             await client.createSale();
 
             expect(await getSalesIds({page: '2', limit: '1'}))
-                .to.deep.equal([sale_id1]);
+                .toEqual([sale_id1]);
         });
 
         txit('formats and fills result', async () => {
@@ -710,12 +708,12 @@ describe('AtomicMarket Sales API', () => {
 
             const [result] = await getSalesAction({}, testContext);
 
-            expect(result).to.not.haveOwnProperty('raw_price');
-            expect(result).to.haveOwnProperty('state');
-            expect(result).to.haveOwnProperty('price');
-            expect(result).to.haveOwnProperty('collection');
+            expect(result).not.toHaveProperty('raw_price');
+            expect(result).toHaveProperty('state');
+            expect(result).toHaveProperty('price');
+            expect(result).toHaveProperty('collection');
         });
     });
 
-    after(async () => await client.end());
+    afterAll(async () => await client.end());
 });

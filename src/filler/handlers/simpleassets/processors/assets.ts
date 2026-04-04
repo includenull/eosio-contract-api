@@ -1,10 +1,10 @@
-import SimpleAssetsHandler, { SimpleAssetsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import { arrayChunk } from '../../../../utils';
+import SimpleAssetsHandler, { SimpleAssetsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import { arrayChunk } from '../../../../utils/index.js';
 import {
     BurnLogActionData,
     ChangeAuthorActionData,
@@ -12,9 +12,9 @@ import {
     CreateLogActionData,
     TransferActionData,
     UpdateActionData
-} from '../types/actions';
-import { parseJsonObject } from '../../../../utils/binary';
-import { encodeDatabaseJson } from '../../../utils';
+} from '../types/actions.js';
+import { parseJsonObject } from '../../../../utils/binary.js';
+import { encodeDatabaseJson } from '../../../utils.js';
 
 export function assetProcessor(core: SimpleAssetsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

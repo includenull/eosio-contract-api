@@ -1,21 +1,21 @@
 import * as fs from 'fs';
 import { PoolClient } from 'pg';
 
-import { ContractHandler } from '../interfaces';
-import logger from '../../../utils/winston';
-import { ConfigTableRow, TokenConfigsTableRow } from './types/tables';
-import DataProcessor from '../../processor';
-import ApiNotificationSender from '../../notifier';
-import { assetProcessor } from './processors/assets';
-import { balanceProcessor } from './processors/balances';
-import { collectionProcessor } from './processors/collections';
-import { configProcessor } from './processors/config';
-import { logProcessor } from './processors/logs';
-import { offerProcessor } from './processors/offers';
-import { schemaProcessor } from './processors/schemas';
-import { templateProcessor } from './processors/templates';
-import Filler  from '../../filler';
-import { JobQueuePriority } from '../../jobqueue';
+import { ContractHandler } from '../interfaces.js';
+import logger from '../../../utils/winston.js';
+import { ConfigTableRow, TokenConfigsTableRow } from './types/tables.js';
+import DataProcessor from '../../processor.js';
+import ApiNotificationSender from '../../notifier.js';
+import { assetProcessor } from './processors/assets.js';
+import { balanceProcessor } from './processors/balances.js';
+import { collectionProcessor } from './processors/collections.js';
+import { configProcessor } from './processors/config.js';
+import { logProcessor } from './processors/logs.js';
+import { offerProcessor } from './processors/offers.js';
+import { schemaProcessor } from './processors/schemas.js';
+import { templateProcessor } from './processors/templates.js';
+import Filler  from '../../filler.js';
+import { JobQueuePriority } from '../../jobqueue.js';
 
 export const ATOMICASSETS_BASE_PRIORITY = 0;
 

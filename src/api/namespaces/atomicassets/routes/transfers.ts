@@ -1,20 +1,20 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicAssetsContext, AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { RequestValues } from '../../utils';
-import { FillerHook, fillTransfers } from '../filler';
+import { AtomicAssetsContext, AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { RequestValues } from '../../utils.js';
+import { FillerHook, fillTransfers } from '../filler.js';
 import {
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters
-} from '../../../docs';
-import { greylistFilterParameters } from '../openapi';
-import ApiNotificationReceiver from '../../../notification';
-import { createSocketApiNamespace } from '../../../utils';
-import { NotificationData } from '../../../../filler/notifier';
-import { getRawTransfersAction, getTransfersCountAction } from '../handlers/transfers';
+} from '../../../docs.js';
+import { greylistFilterParameters } from '../openapi.js';
+import ApiNotificationReceiver from '../../../notification.js';
+import { createSocketApiNamespace } from '../../../utils.js';
+import { NotificationData } from '../../../../filler/notifier.js';
+import { getRawTransfersAction, getTransfersCountAction } from '../handlers/transfers.js';
 
 export class TransferApi {
     constructor(
@@ -36,7 +36,7 @@ export class TransferApi {
             result.rows.map(this.transferFormatter),
             this.assetFormatter, this.assetView, this.fillerHook
         );
-    }
+    };
 
     endpoints(router: express.Router): any {
         const {caching, returnAsJSON} = this.server.web;

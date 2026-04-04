@@ -1,9 +1,9 @@
-import { AtomicMarketUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import AtomicMarketHandler from '../index';
+import { AtomicMarketUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import AtomicMarketHandler from '../index.js';
 import {
     AcceptBuyofferActionData,
     AuctionClaimBuyerActionData,
@@ -11,7 +11,7 @@ import {
     CancelAuctionActionData, CancelBuyofferActionData, CancelSaleActionData, DeclineBuyofferActionData,
     LogAuctionStartActionData,
     LogNewAuctionActionData, LogNewBuyofferActionData, LogNewSaleActionData, LogSaleStartActionData, PurchaseSaleActionData
-} from '../types/actions';
+} from '../types/actions.js';
 
 export function logProcessor(core: AtomicMarketHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

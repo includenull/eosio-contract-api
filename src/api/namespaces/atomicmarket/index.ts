@@ -1,25 +1,25 @@
-import * as express from 'express';
+import express from 'express';
 
-import { ApiNamespace } from '../interfaces';
-import { HTTPServer } from '../../server';
-import { AssetApi } from '../atomicassets/routes/assets';
-import { OfferApi } from '../atomicassets/routes/offers';
-import { TransferApi } from '../atomicassets/routes/transfers';
-import { auctionsEndpoints, auctionSockets } from './routes/auctions';
-import { salesEndpoints, salesSockets } from './routes/sales';
-import { atomicmarketComponents } from './openapi';
-import { configEndpoints } from './routes/config';
-import { marketplacesEndpoints } from './routes/marketplaces';
-import { formatOffer, formatTransfer } from '../atomicassets/format';
-import { formatListingAsset, buildAssetFillerHook } from './format';
-import { pricesEndpoints } from './routes/prices';
-import { statsEndpoints } from './routes/stats';
-import ApiNotificationReceiver from '../../notification';
-import { buyoffersEndpoints, buyofferSockets } from './routes/buyoffers';
-import { assetsEndpoints } from './routes/assets';
-import { ActionHandlerContext } from '../../actionhandler';
-import { ILimits } from '../../../types/config';
-import { templateBuyoffersEndpoints } from './routes/template-buyoffers';
+import { ApiNamespace } from '../interfaces.js';
+import { HTTPServer } from '../../server.js';
+import { AssetApi } from '../atomicassets/routes/assets.js';
+import { OfferApi } from '../atomicassets/routes/offers.js';
+import { TransferApi } from '../atomicassets/routes/transfers.js';
+import { auctionsEndpoints, auctionSockets } from './routes/auctions.js';
+import { salesEndpoints, salesSockets } from './routes/sales.js';
+import { atomicmarketComponents } from './openapi.js';
+import { configEndpoints } from './routes/config.js';
+import { marketplacesEndpoints } from './routes/marketplaces.js';
+import { formatOffer, formatTransfer } from '../atomicassets/format.js';
+import { formatListingAsset, buildAssetFillerHook } from './format.js';
+import { pricesEndpoints } from './routes/prices.js';
+import { statsEndpoints } from './routes/stats.js';
+import ApiNotificationReceiver from '../../notification.js';
+import { buyoffersEndpoints, buyofferSockets } from './routes/buyoffers.js';
+import { assetsEndpoints } from './routes/assets.js';
+import { ActionHandlerContext } from '../../actionhandler.js';
+import { ILimits } from '../../../types/config.js';
+import { templateBuyoffersEndpoints } from './routes/template-buyoffers.js';
 
 export interface AtomicMarketNamespaceArgs {
     connected_reader: string;

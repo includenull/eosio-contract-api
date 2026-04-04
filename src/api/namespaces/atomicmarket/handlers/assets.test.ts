@@ -1,10 +1,8 @@
-import 'mocha';
-import {expect} from 'chai';
-import {RequestValues} from '../../utils';
-import {initAtomicMarketTest} from '../test';
-import {getTestContext} from '../../../../utils/test';
-import {getMarketAssetsAction} from './assets';
-import {SaleState} from '../../../../filler/handlers/atomicmarket';
+import {RequestValues} from '../../utils.js';
+import {initAtomicMarketTest} from '../test.js';
+import {getTestContext} from '../../../../utils/test.js';
+import {getMarketAssetsAction} from './assets.js';
+import {SaleState} from '../../../../filler/handlers/atomicmarket/index.js';
 
 const {client, txit} = initAtomicMarketTest();
 
@@ -44,7 +42,7 @@ describe('AtomicMarket Assets API', () => {
             await client.refreshTemplatePrices();
 
             expect(await getAssetIds({sort: 'suggested_median_price', asset_id: `${asset_id1},${asset_id2}`}))
-                .to.deep.equal([asset_id1, asset_id2]);
+                .toEqual([asset_id1, asset_id2]);
         });
 
         txit('orders by suggested average price', async () => {
@@ -72,7 +70,7 @@ describe('AtomicMarket Assets API', () => {
             await client.refreshTemplatePrices();
 
             expect(await getAssetIds({sort: 'suggested_average_price', asset_id: `${asset_id1},${asset_id2}`}))
-                .to.deep.equal([asset_id1, asset_id2]);
+                .toEqual([asset_id1, asset_id2]);
         });
 
         txit('orders by median price', async () => {
@@ -100,7 +98,7 @@ describe('AtomicMarket Assets API', () => {
             await client.refreshTemplatePrices();
 
             expect(await getAssetIds({sort: 'median_price', asset_id: `${asset_id1},${asset_id2}`}))
-                .to.deep.equal([asset_id1, asset_id2]);
+                .toEqual([asset_id1, asset_id2]);
         });
 
         txit('orders by average price', async () => {
@@ -128,12 +126,12 @@ describe('AtomicMarket Assets API', () => {
             await client.refreshTemplatePrices();
 
             expect(await getAssetIds({sort: 'average_price', asset_id: `${asset_id1},${asset_id2}`}))
-                .to.deep.equal([asset_id1, asset_id2]);
+                .toEqual([asset_id1, asset_id2]);
         });
 
     });
 
-    after(async () => {
+    afterAll(async () => {
         await client.end();
     });
 });

@@ -1,12 +1,12 @@
-import AtomicAssetsHandler, { AtomicAssetsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioContractRow } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import { CollectionsTableRow } from '../types/tables';
+import AtomicAssetsHandler, { AtomicAssetsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioContractRow } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import { CollectionsTableRow } from '../types/tables.js';
 import { deserialize, ObjectSchema } from 'atomicassets';
-import { encodeDatabaseJson } from '../../../utils';
+import { encodeDatabaseJson } from '../../../utils.js';
 
 export function collectionProcessor(core: AtomicAssetsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

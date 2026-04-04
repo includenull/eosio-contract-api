@@ -1,6 +1,6 @@
-import { RequestValues } from './utils';
-import { isWeakFloat, isWeakInt, toInt } from '../../utils';
-import { ApiError } from '../error';
+import { RequestValues } from './utils.js';
+import { isWeakFloat, isWeakInt, toInt } from '../../utils/index.js';
+import { ApiError } from '../error.js';
 
 type FilterType = 'string' | 'string[]' | 'list[string]'
     | 'int' | 'int[]'

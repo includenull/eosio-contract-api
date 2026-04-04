@@ -1,10 +1,10 @@
 import * as os from 'os';
-import * as express from 'express';
+import express from 'express';
 import {Registry} from 'prom-client';
 
-import logger from '../utils/winston';
-import ConnectionManager from '../connections/manager';
-import {ICollectOptions, MetricsCollectorHandler} from './handler';
+import logger from '../utils/winston.js';
+import ConnectionManager from '../connections/manager.js';
+import {ICollectOptions, MetricsCollectorHandler} from './handler.js';
 
 
 export class MetricsServer {

@@ -1,10 +1,10 @@
 import {Namespace} from 'socket.io';
-import * as express from 'express';
+import express from 'express';
 
-import {DB, HTTPServer} from './server';
-import {NotificationData} from '../filler/notifier';
-import {ApiError} from './error';
-import logger from '../utils/winston';
+import {DB, HTTPServer} from './server.js';
+import {NotificationData} from '../filler/notifier.js';
+import {ApiError} from './error.js';
+import logger from '../utils/winston.js';
 
 export async function getContractActionLogs(
     db: DB, contract: string, actions: string[], condition: { [key: string]: any },
@@ -16,7 +16,10 @@ export async function getContractActionLogs(
         'ORDER BY global_sequence ' + (order === 'asc' ? 'ASC' : 'DESC') + ' LIMIT $4 OFFSET $5 ';
 
     const query = await db.query(queryStr, [contract, actions, JSON.stringify(condition), limit, offset]);
-    const emptyCondition = Object.keys(condition).reduce((prev, curr) => ({...prev, [curr]: undefined}), {});
+    const emptyCondition = Object.keys(condition).reduce<Record<string, undefined>>(
+        (prev, curr) => ({...prev, [curr]: undefined}),
+        {}
+    );
 
     return query.rows.map(row => ({
         ...row, data: JSON.parse(JSON.stringify({...row.data, ...emptyCondition}))

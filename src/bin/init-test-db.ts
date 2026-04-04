@@ -1,9 +1,11 @@
-import { upgradeDb } from '../filler/upgrade-db';
-import PostgresConnection from '../connections/postgres';
-import logger from '../utils/winston';
-import { IConnectionsConfig } from '../types/config';
+import { upgradeDb } from '../filler/upgrade-db.js';
+import PostgresConnection from '../connections/postgres.js';
+import logger from '../utils/winston.js';
+import { IConnectionsConfig } from '../types/config.js';
+import { createRequire } from 'node:module';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const require = createRequire(import.meta.url);
+
 const connectionConfig: IConnectionsConfig = require('../../config/connections.config.json');
 
 async function main(): Promise<void> {

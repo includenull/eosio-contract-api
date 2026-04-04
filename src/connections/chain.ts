@@ -1,7 +1,6 @@
-import fetch from 'node-fetch';
-import { Api, JsonRpc } from 'eosjs/dist';
-import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig';
-import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces';
+import { Api, JsonRpc } from 'eosjs/dist/index.js';
+import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig.js';
+import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
 
 export default class ChainApi {
     readonly rpc: JsonRpc;

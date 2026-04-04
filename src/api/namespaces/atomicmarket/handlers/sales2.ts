@@ -1,14 +1,14 @@
-import {buildBoundaryFilter, RequestValues} from '../../utils';
-import {AtomicMarketContext, SaleApiState} from '../index';
-import QueryBuilder from '../../../builder';
-import {fillSales} from '../filler';
-import {formatSale} from '../format';
-import {ApiError} from '../../../error';
-import {toInt} from '../../../../utils';
-import moize from 'moize';
-import {filterQueryArgs, FilterValues} from '../../validation';
-import {hasAssetFilter} from '../../atomicassets/utils';
-import {buildTemplateMintFilter} from '../utils';
+import {buildBoundaryFilter, RequestValues} from '../../utils.js';
+import {AtomicMarketContext, SaleApiState} from '../index.js';
+import QueryBuilder from '../../../builder.js';
+import {fillSales} from '../filler.js';
+import {formatSale} from '../format.js';
+import {ApiError} from '../../../error.js';
+import {toInt} from '../../../../utils/index.js';
+import { memoize } from 'micro-memoize';
+import {filterQueryArgs, FilterValues} from '../../validation.js';
+import {hasAssetFilter} from '../../atomicassets/utils.js';
+import {buildTemplateMintFilter} from '../utils.js';
 
 type SalesSearchOptions = {
     values: FilterValues;
@@ -507,26 +507,29 @@ function getDataFilters(search: SalesSearchOptions): string[] {
 
 const largeSalesResult = 50_000;
 
-const getSaleCount = moize({
-    isPromise: true,
-    maxAge: 1000 * 60 * 60 * 24,
-    maxArgs: 3,
-    maxSize: 1_000_000,
-})(async (filter: string, value: string, saleState: number, search: SalesSearchOptions): Promise<number> => {
-    const {rows} = await search.ctx.db.query(`
-        SELECT COUNT(*)::INT ct
-        FROM (
-                SELECT
-                FROM atomicmarket_sales_filters
-                WHERE market_contract = $1
-                    AND ((filter @> create_atomicmarket_sales_filter(${filter}s => $2)))
-                    AND sale_state = $3
-                LIMIT ${largeSalesResult + 1}
-            ) filtered
+const getSaleCount = memoize(
+    async (filter: string, value: string, saleState: number, search: SalesSearchOptions): Promise<number> => {
+        const {rows} = await search.ctx.db.query(`
+            SELECT COUNT(*)::INT ct
+            FROM (
+                    SELECT
+                    FROM atomicmarket_sales_filters
+                    WHERE market_contract = $1
+                        AND ((filter @> create_atomicmarket_sales_filter(${filter}s => $2)))
+                        AND sale_state = $3
+                    LIMIT ${largeSalesResult + 1}
+                ) filtered
             `, [search.ctx.coreArgs.atomicmarket_account, [value], saleState]);
 
-    return rows[0].ct;
-});
+        return rows[0].ct;
+    },
+    {
+        async: true,
+        expires: 1000 * 60 * 60 * 24,
+        maxArgs: 3,
+        maxSize: 1_000_000,
+    }
+);
 
 const FILTERS_REQUIRING_COUNTING = ['collection_name', 'template_id', 'schema_name'];
 async function isStrongMainFilter(filter: string, values: string[], search: SalesSearchOptions): Promise<boolean> {

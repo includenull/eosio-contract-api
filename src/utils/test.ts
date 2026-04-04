@@ -1,12 +1,14 @@
 import { Client } from 'pg';
-import { AsyncFunc, Test } from 'mocha';
-import { DB } from '../api/server';
-import { RequestValues } from '../api/namespaces/utils';
-import { AtomicMarketContext } from '../api/namespaces/atomicmarket';
-import { IConnectionsConfig } from '../types/config';
-import { initListValidator } from '../api/namespaces/lists';
+import { it } from 'vitest';
+import { DB } from '../api/server.js';
+import { RequestValues } from '../api/namespaces/utils.js';
+import { AtomicMarketContext } from '../api/namespaces/atomicmarket/index.js';
+import { IConnectionsConfig } from '../types/config.js';
+import { initListValidator } from '../api/namespaces/lists.js';
+import { createRequire } from 'node:module';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const require = createRequire(import.meta.url);
+
 export const connectionConfig: IConnectionsConfig = require('../../config/connections.config.json');
 
 export class TestClient extends Client implements DB {
@@ -112,8 +114,10 @@ export class TestClient extends Client implements DB {
 
 }
 
+type TxItFn = (this: any, client: TestClient) => Promise<void>;
+
 export function createTxIt(client: TestClient): any {
-    async function runTxTest(fn: () => Promise<void>, self: any): Promise<any> {
+    async function runTxTest(fn: TxItFn, self: any): Promise<any> {
         await client.query('BEGIN');
 
         initListValidator(client);
@@ -127,22 +131,23 @@ export function createTxIt(client: TestClient): any {
         }
     }
 
-    const result = function txit(title: string, fn: () => Promise<void>): Test {
-        return it(title, async function () {
-            return await runTxTest(fn, this);
+    function txit(title: string, fn: TxItFn): ReturnType<typeof it> {
+        return it(title, async function (): Promise<void> {
+            await runTxTest(fn, this);
         });
-    };
+    }
 
-    result.skip = (title: string, func: () => Promise<void>): Test => it.skip(title, func as unknown as AsyncFunc);
-
-    result.only = function (title: string, fn: () => Promise<void>): Test {
-
-        return it.only(title, async () => {
-            return await runTxTest(fn, this);
+    txit.skip = (title: string, fn: TxItFn): ReturnType<typeof it.skip> =>
+        it.skip(title, async function (): Promise<void> {
+            await runTxTest(fn, this);
         });
-    };
 
-    return result;
+    txit.only = (title: string, fn: TxItFn): ReturnType<typeof it.only> =>
+        it.only(title, async function (): Promise<void> {
+            await runTxTest(fn, this);
+        });
+
+    return txit;
 }
 
 export function getTestContext(db: DB, pathParams: RequestValues = {}): AtomicMarketContext {

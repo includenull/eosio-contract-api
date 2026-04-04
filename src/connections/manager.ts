@@ -1,9 +1,9 @@
-import StateHistoryBlockReader from './ship';
-import ChainApi from './chain';
-import RedisConnection from './redis';
-import PostgresConnection from './postgres';
-import { IConnectionsConfig } from '../types/config';
-import { IBlockReaderOptions } from '../types/ship';
+import StateHistoryBlockReader from './ship.js';
+import ChainApi from './chain.js';
+import RedisConnection from './redis.js';
+import PostgresConnection from './postgres.js';
+import { IConnectionsConfig } from '../types/config.js';
+import { IBlockReaderOptions } from '../types/ship.js';
 
 export default class ConnectionManager {
     readonly chain: ChainApi;

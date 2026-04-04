@@ -1,12 +1,12 @@
-import SimpleAssetsHandler, { SimpleAssetsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioContractRow } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import { AuthorsTableRow } from '../types/tables';
-import { parseJsonObject } from '../../../../utils/binary';
-import { encodeDatabaseJson } from '../../../utils';
+import SimpleAssetsHandler, { SimpleAssetsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioContractRow } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import { AuthorsTableRow } from '../types/tables.js';
+import { parseJsonObject } from '../../../../utils/binary.js';
+import { encodeDatabaseJson } from '../../../utils.js';
 
 export function authorProcessor(core: SimpleAssetsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

@@ -1,5 +1,5 @@
-import { DB } from './server';
-import { RequestValues } from './namespaces/utils';
+import { DB } from './server.js';
+import { RequestValues } from './namespaces/utils.js';
 
 export interface ActionHandlerContext<T> {
     pathParams: RequestValues,

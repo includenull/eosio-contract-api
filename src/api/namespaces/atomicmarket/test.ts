@@ -1,7 +1,7 @@
-import { SaleApiState } from './index';
-import { AtomicAssetsTestClient } from '../atomicassets/test';
-import { createTxIt } from '../../../utils/test';
-import {AuctionState, SaleState} from '../../../filler/handlers/atomicmarket';
+import { SaleApiState } from './index.js';
+import { AtomicAssetsTestClient } from '../atomicassets/test.js';
+import { createTxIt } from '../../../utils/test.js';
+import {AuctionState, SaleState} from '../../../filler/handlers/atomicmarket/index.js';
 
 export function initAtomicMarketTest(): {client: AtomicMarketTestClient, txit: any} {
     const client = new AtomicMarketTestClient();

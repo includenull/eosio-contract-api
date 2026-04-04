@@ -1,9 +1,9 @@
-import * as express from 'express';
+import express from 'express';
 import * as crypto from 'crypto';
 import { RedisClientType } from 'redis';
 
-import logger from './winston';
-import { mergeRequestData } from '../api/namespaces/utils';
+import logger from './winston.js';
+import { mergeRequestData } from '../api/namespaces/utils.js';
 
 
 export type ExpressRedisCacheOptions = {
@@ -52,7 +52,7 @@ export function expressRedisCache(
 
             redis.get(key).then(reply => {
                 let expire = 0;
-                if (reply) {
+                if (reply && typeof reply === 'string') {
                     const split = reply.split('::');
 
                     if (split[3]) {
@@ -88,7 +88,7 @@ export function expressRedisCache(
                     };
 
                     next();
-                } else {
+                } else if (reply && typeof reply === 'string') {
                     const split = reply.split('::');
 
                     if (split[0]) {

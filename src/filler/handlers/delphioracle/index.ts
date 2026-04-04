@@ -1,14 +1,14 @@
 import * as fs from 'fs';
 import { PoolClient } from 'pg';
 
-import { ContractHandler } from '../interfaces';
-import { ShipBlock } from '../../../types/ship';
-import { EosioContractRow } from '../../../types/eosio';
-import { ContractDBTransaction } from '../../database';
-import logger from '../../../utils/winston';
-import { eosioTimestampToDate } from '../../../utils/eosio';
-import Filler from '../../filler';
-import DataProcessor from '../../processor';
+import { ContractHandler } from '../interfaces.js';
+import { ShipBlock } from '../../../types/ship.js';
+import { EosioContractRow } from '../../../types/eosio.js';
+import { ContractDBTransaction } from '../../database.js';
+import logger from '../../../utils/winston.js';
+import { eosioTimestampToDate } from '../../../utils/eosio.js';
+import Filler from '../../filler.js';
+import DataProcessor from '../../processor.js';
 
 export const DELPHIORACLE_BASE_PRIORITY = 0;
 

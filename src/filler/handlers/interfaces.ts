@@ -1,9 +1,9 @@
 import { PoolClient } from 'pg';
 
-import ConnectionManager from '../../connections/manager';
-import DataProcessor from '../processor';
-import ApiNotificationSender from '../notifier';
-import Filler from '../filler';
+import ConnectionManager from '../../connections/manager.js';
+import DataProcessor from '../processor.js';
+import ApiNotificationSender from '../notifier.js';
+import Filler from '../filler.js';
 
 export type ContractHandlerScope = {[key: string]: Array<{ filter: string, deserialize: boolean }>};
 

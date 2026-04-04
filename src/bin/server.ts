@@ -1,16 +1,18 @@
-import ConnectionManager from '../connections/manager';
-import logger from '../utils/winston';
-import { IConnectionsConfig, IServerConfig } from '../types/config';
-import Api from '../api/api';
-import {MetricsServer} from '../metrics/server';
+import ConnectionManager from '../connections/manager.js';
+import logger from '../utils/winston.js';
+import { IConnectionsConfig, IServerConfig } from '../types/config.js';
+import Api from '../api/api.js';
+import {MetricsServer} from '../metrics/server.js';
+import { createRequire } from 'node:module';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const require = createRequire(import.meta.url);
+
 const serverConfig: IServerConfig = require('../../config/server.config.json');
 
 let connectionConfig: IConnectionsConfig = {postgres: {}, redis: {}, chain: {}} as IConnectionsConfig;
 
 try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     connectionConfig = require('../../config/connections.config.json');
 } catch {
     logger.warn('No connections.config.json found. Falling back to environment variables');

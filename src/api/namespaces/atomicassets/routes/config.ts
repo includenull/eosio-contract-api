@@ -1,9 +1,9 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { getOpenAPI3Responses } from '../../../docs';
-import { getConfigAction } from '../handlers/config';
+import { AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { getOpenAPI3Responses } from '../../../docs.js';
+import { getConfigAction } from '../handlers/config.js';
 
 export function configEndpoints(core: AtomicAssetsNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

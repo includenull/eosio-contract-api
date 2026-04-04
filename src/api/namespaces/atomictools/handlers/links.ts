@@ -1,12 +1,12 @@
-import { buildBoundaryFilter, RequestValues } from '../../utils';
-import { AtomicToolsContext } from '../index';
-import QueryBuilder from '../../../builder';
+import { buildBoundaryFilter, RequestValues } from '../../utils.js';
+import { AtomicToolsContext } from '../index.js';
+import QueryBuilder from '../../../builder.js';
 import { Numeric } from 'eosjs';
-import { fillLinks } from '../filler';
-import { formatLink } from '../format';
-import { ApiError } from '../../../error';
-import { applyActionGreylistFilters, getContractActionLogs } from '../../../utils';
-import { filterQueryArgs } from '../../validation';
+import { fillLinks } from '../filler.js';
+import { formatLink } from '../format.js';
+import { ApiError } from '../../../error.js';
+import { applyActionGreylistFilters, getContractActionLogs } from '../../../utils.js';
+import { filterQueryArgs } from '../../validation.js';
 
 export async function getLinksAction(params: RequestValues, ctx: AtomicToolsContext): Promise<any> {
     const maxLimit = ctx.coreArgs.limits?.links || 100;

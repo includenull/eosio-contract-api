@@ -1,24 +1,24 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicMarketNamespace } from '../index';
-import { HTTPServer } from '../../../server';
+import { AtomicMarketNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
 import {
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
+} from '../../../docs.js';
 import {
     extendedAssetFilterParameters,
     baseAssetFilterParameters,
     greylistFilterParameters,
     hideOffersParameters, extendedAssetFilterParametersSpecificOwner
-} from '../../atomicassets/openapi';
+} from '../../atomicassets/openapi.js';
 import {
     getAssetSalesAction,
     getPricesAction, getPricesAssetsAction,
     getPricesSalesDaysAction,
     getPricesTemplatesAction, getUsersInventoryPrices
-} from '../handlers/prices';
+} from '../handlers/prices.js';
 
 export function pricesEndpoints(core: AtomicMarketNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

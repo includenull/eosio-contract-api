@@ -1,11 +1,10 @@
-import { TextDecoder, TextEncoder } from 'text-encoding';
-import { SerialBuffer } from 'eosjs/dist/eosjs-serialize';
+import { SerialBuffer } from 'eosjs/dist/eosjs-serialize.js';
 
-import { deserializeUInt, serializeUInt } from './binary';
+import { deserializeUInt, serializeUInt } from './binary.js';
 import { Serialize } from 'eosjs';
-import { ShipTableDelta, ShipTransactionTrace } from '../types/ship';
-import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio';
-import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces';
+import { ShipTableDelta, ShipTransactionTrace } from '../types/ship.js';
+import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio.js';
+import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
 
 export function serializeEosioName(name: string): string {
     const buffer = new SerialBuffer({textEncoder: new TextEncoder(), textDecoder: new TextDecoder()});

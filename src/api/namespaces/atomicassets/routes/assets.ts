@@ -1,15 +1,15 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicAssetsContext, AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { RequestValues } from '../../utils';
+import { AtomicAssetsContext, AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { RequestValues } from '../../utils.js';
 import {
     actionGreylistParameters,
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters
-} from '../../../docs';
+} from '../../../docs.js';
 import {
     atomicDataFilter,
     baseAssetFilterParameters,
@@ -17,14 +17,14 @@ import {
     extendedAssetFilterParameters,
     greylistFilterParameters,
     hideOffersParameters
-} from '../openapi';
-import { fillAssets, FillerHook } from '../filler';
-import { createSocketApiNamespace, extractNotificationIdentifiers, } from '../../../utils';
-import ApiNotificationReceiver from '../../../notification';
-import { NotificationData } from '../../../../filler/notifier';
-import { getAssetLogsAction, getAssetsCountAction, getAssetStatsAction, getRawAssetsAction } from '../handlers/assets';
-import { ApiError } from '../../../error';
-import { filterQueryArgs } from '../../validation';
+} from '../openapi.js';
+import { fillAssets, FillerHook } from '../filler.js';
+import { createSocketApiNamespace, extractNotificationIdentifiers, } from '../../../utils.js';
+import ApiNotificationReceiver from '../../../notification.js';
+import { NotificationData } from '../../../../filler/notifier.js';
+import { getAssetLogsAction, getAssetsCountAction, getAssetStatsAction, getRawAssetsAction } from '../handlers/assets.js';
+import { ApiError } from '../../../error.js';
+import { filterQueryArgs } from '../../validation.js';
 
 export class AssetApi {
     constructor(
@@ -104,7 +104,7 @@ export class AssetApi {
         }
 
         return assets[0];
-    }
+    };
 
     singleAssetEndpoints(router: express.Router): any {
         const {caching, returnAsJSON} = this.server.web;

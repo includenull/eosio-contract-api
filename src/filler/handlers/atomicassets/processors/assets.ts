@@ -1,20 +1,20 @@
-import AtomicAssetsHandler, { AtomicAssetsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
+import AtomicAssetsHandler, { AtomicAssetsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
 import {
     LogBackAssetActionData,
     LogBurnAssetActionData,
     LogMintAssetActionData,
     LogSetDataActionData,
     LogTransferActionData
-} from '../types/actions';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate, splitEosioToken } from '../../../../utils/eosio';
-import { convertAttributeMapToObject } from '../utils';
-import ApiNotificationSender from '../../../notifier';
-import { arrayChunk } from '../../../../utils';
-import { encodeDatabaseJson } from '../../../utils';
+} from '../types/actions.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate, splitEosioToken } from '../../../../utils/eosio.js';
+import { convertAttributeMapToObject } from '../utils.js';
+import ApiNotificationSender from '../../../notifier.js';
+import { arrayChunk } from '../../../../utils/index.js';
+import { encodeDatabaseJson } from '../../../utils.js';
 
 export function assetProcessor(core: AtomicAssetsHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

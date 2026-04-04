@@ -1,13 +1,13 @@
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import AtomicMarketHandler, { AtomicMarketUpdatePriority, BuyofferState } from '../index';
-import ApiNotificationSender from '../../../notifier';
-import { AcceptBuyofferActionData, CancelBuyofferActionData, DeclineBuyofferActionData, LogNewBuyofferActionData } from '../types/actions';
-import { preventInt64Overflow } from '../../../../utils/binary';
-import logger from '../../../../utils/winston';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import AtomicMarketHandler, { AtomicMarketUpdatePriority, BuyofferState } from '../index.js';
+import ApiNotificationSender from '../../../notifier.js';
+import { AcceptBuyofferActionData, CancelBuyofferActionData, DeclineBuyofferActionData, LogNewBuyofferActionData } from '../types/actions.js';
+import { preventInt64Overflow } from '../../../../utils/binary.js';
+import logger from '../../../../utils/winston.js';
 
 export function buyofferProcessor(core: AtomicMarketHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

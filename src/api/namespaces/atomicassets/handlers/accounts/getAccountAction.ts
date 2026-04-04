@@ -1,12 +1,12 @@
-import {RequestValues} from '../../../utils';
-import {AtomicAssetsContext} from '../../index';
+import {RequestValues} from '../../../utils.js';
+import {AtomicAssetsContext} from '../../index.js';
 import {QueryResult} from 'pg';
-import QueryBuilder from '../../../../builder';
-import {buildGreylistFilter, buildHideOffersFilter} from '../../utils';
-import {ICollection, ITemplate} from 'atomicassets/build/API/Explorer/Objects';
-import {formatCollection, formatSchema, formatTemplate} from '../../format';
-import {ISchema} from 'atomicassets/build/Schema';
-import { arrayUnique } from '../../../../../utils';
+import QueryBuilder from '../../../../builder.js';
+import {buildGreylistFilter, buildHideOffersFilter} from '../../utils.js';
+import {ICollection, ITemplate} from 'atomicassets/build/API/Explorer/Objects.js';
+import {formatCollection, formatSchema, formatTemplate} from '../../format.js';
+import type { ISchema } from 'atomicassets/build/Schema/index.js';
+import { arrayUnique } from '../../../../../utils/index.js';
 
 /**
  * Retrieves the account stats lie collection and assets count and templates

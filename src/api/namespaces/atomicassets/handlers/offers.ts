@@ -1,9 +1,9 @@
-import { buildBoundaryFilter, RequestValues } from '../../utils';
-import { AtomicAssetsContext } from '../index';
-import QueryBuilder from '../../../builder';
-import { buildAssetFilter, hasAssetFilter } from '../utils';
-import { applyActionGreylistFilters, getContractActionLogs } from '../../../utils';
-import { filterQueryArgs } from '../../validation';
+import { buildBoundaryFilter, RequestValues } from '../../utils.js';
+import { AtomicAssetsContext } from '../index.js';
+import QueryBuilder from '../../../builder.js';
+import { buildAssetFilter, hasAssetFilter } from '../utils.js';
+import { applyActionGreylistFilters, getContractActionLogs } from '../../../utils.js';
+import { filterQueryArgs } from '../../validation.js';
 
 export async function getRawOffersAction(params: RequestValues, ctx: AtomicAssetsContext): Promise<any> {
     const maxLimit = ctx.coreArgs.limits?.offers || 100;

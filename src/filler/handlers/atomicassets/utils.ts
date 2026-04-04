@@ -1,4 +1,4 @@
-import { AttributeMap } from './types/actions';
+import { AttributeMap } from './types/actions.js';
 
 export function convertAttributeMapToObject(data: AttributeMap): {[key: string]: string} {
     const result: {[key: string]: string} = {};

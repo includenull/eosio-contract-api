@@ -1,11 +1,11 @@
-import AtomicToolsHandler, { AtomicToolsUpdatePriority, LinkState } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { ShipBlock } from '../../../../types/ship';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
+import AtomicToolsHandler, { AtomicToolsUpdatePriority, LinkState } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
 import { Numeric } from 'eosjs';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import { CancelLinkActionData, ClaimLinkActionData, LogLinkStartActionData, LogNewLinkActionData } from '../types/actions';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import { CancelLinkActionData, ClaimLinkActionData, LogLinkStartActionData, LogNewLinkActionData } from '../types/actions.js';
 
 export function linkProcessor(core: AtomicToolsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

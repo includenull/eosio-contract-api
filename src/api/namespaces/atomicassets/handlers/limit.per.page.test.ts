@@ -1,10 +1,9 @@
-import {getAccountsAction} from './accounts';
-import {expect} from 'chai';
-import {initAtomicAssetsTest} from '../test';
+import {getAccountsAction} from './accounts.js';
+import {initAtomicAssetsTest} from '../test.js';
 
 describe('getAccountsAction limits', () => {
     const {client, txit} = initAtomicAssetsTest();
-    after(async () => {
+    afterAll(async () => {
         await client.end();
     });
 
@@ -35,7 +34,7 @@ describe('getAccountsAction limits', () => {
                 }
             }
         });
-        expect(response.length).to.equal(2);
+        expect(response.length).toBe(2);
     });
 
     txit('limit bigger than set max', async () => {
@@ -70,8 +69,8 @@ describe('getAccountsAction limits', () => {
         } catch (error) {
             response = error;
         }
-        expect(response.code).to.equal(400);
-        expect(response.message).to.contain('Invalid value for parameter limit');
+        expect(response.code).toBe(400);
+        expect(response.message).toContain('Invalid value for parameter limit');
     });
 
     txit('set max smaller than default', async () => {
@@ -101,6 +100,6 @@ describe('getAccountsAction limits', () => {
                 }
             }
         });
-        expect(response.length).to.equal(2);
+        expect(response.length).toBe(2);
     });
 });

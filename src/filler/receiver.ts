@@ -1,15 +1,15 @@
 import { Serialize } from 'eosjs';
-import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces';
+import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
 import PQueue from 'p-queue';
 
-import logger from '../utils/winston';
-import ConnectionManager from '../connections/manager';
-import StateHistoryBlockReader from '../connections/ship';
-import { IReaderConfig } from '../types/config';
-import { ShipBlock, ShipBlockResponse, ShipTableDelta, ShipTransactionTrace } from '../types/ship';
-import { EosioAction, EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio';
-import { ContractDB, ContractDBTransaction } from './database';
-import { binToHex } from '../utils/binary';
+import logger from '../utils/winston.js';
+import ConnectionManager from '../connections/manager.js';
+import StateHistoryBlockReader from '../connections/ship.js';
+import { IReaderConfig } from '../types/config.js';
+import { ShipBlock, ShipBlockResponse, ShipTableDelta, ShipTransactionTrace } from '../types/ship.js';
+import { EosioAction, EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio.js';
+import { ContractDB, ContractDBTransaction } from './database.js';
+import { binToHex } from '../utils/binary.js';
 import {
     deserializeEosioType,
     eosioTimestampToDate,
@@ -17,12 +17,12 @@ import {
     extractShipTraces,
     getActionAbiType,
     getTableAbiType
-} from '../utils/eosio';
-import DataProcessor, { ProcessingState } from './processor';
-import { ContractHandler } from './handlers/interfaces';
-import ApiNotificationSender from './notifier';
-import Semaphore from '../utils/semaphore';
-import { ModuleLoader } from './modules';
+} from '../utils/eosio.js';
+import DataProcessor, { ProcessingState } from './processor.js';
+import { ContractHandler } from './handlers/interfaces.js';
+import ApiNotificationSender from './notifier.js';
+import Semaphore from '../utils/semaphore.js';
+import { ModuleLoader } from './modules.js';
 
 type AbiCache = {
     types: Map<string, Serialize.Type>,
@@ -60,6 +60,7 @@ export default class StateReceiver {
     readonly database: ContractDB;
 
     private readonly abis: {[key: string]: AbiCache};
+    private readonly shipMinBlockConfirmation: number;
 
     constructor(
         readonly config: IReaderConfig,
@@ -70,6 +71,7 @@ export default class StateReceiver {
         this.name = config.name;
         this.database = new ContractDB(this.config.name, this.connection);
         this.abis = {};
+        this.shipMinBlockConfirmation = Math.max(1, config.ship_min_block_confirmation || 1);
 
         this.processor = new DataProcessor(ProcessingState.CATCHUP, this.modules);
         this.processor.onActionTrace('eosio', 'setcode', () => null);
@@ -106,6 +108,7 @@ export default class StateReceiver {
         }
 
         this.processor.setState(position.live ? ProcessingState.HEAD : ProcessingState.CATCHUP);
+        this.updateShipConfirmationMode();
 
         let startBlock = position.block_num + 1;
 
@@ -151,7 +154,7 @@ export default class StateReceiver {
 
     private async consumer(resp: ShipBlockResponse): Promise<void> {
         await this.dsLock.acquire();
-
+        
         const actionTraces = await this.prepareActionTraces(resp.this_block.block_num, resp.traces);
         const contractRows = await this.prepareContractRows(resp.this_block.block_num, resp.deltas);
 
@@ -193,6 +196,7 @@ export default class StateReceiver {
             logger.info('Catchup completed. Switching to head mode');
 
             this.processor.setState(ProcessingState.HEAD);
+            this.updateShipConfirmationMode();
         }
 
         const db = (this.lastDatabaseTransaction && !isReversible) ? this.lastDatabaseTransaction : await this.database.startTransaction(isReversible);
@@ -280,6 +284,17 @@ export default class StateReceiver {
                 throw e;
             }
         }
+    }
+
+    private updateShipConfirmationMode(): void {
+        const minBlockConfirmation = this.processor.getState() === ProcessingState.CATCHUP ? 1 : this.shipMinBlockConfirmation;
+
+        this.ship.setMinBlockConfirmation(minBlockConfirmation);
+
+        logger.info(
+            'Reader ' + this.config.name + ' set ship_min_block_confirmation to ' + minBlockConfirmation +
+            ' (' + ProcessingState[this.processor.getState()].toLowerCase() + ' mode)'
+        );
     }
 
     private async handleActionTrace(block: ShipBlock, trace: EosioActionTrace<ContractDataEstimation>, tx: EosioTransaction<ContractDataEstimation>): Promise<void> {
@@ -416,9 +431,13 @@ export default class StateReceiver {
                     ]
                 );
 
-                logger.info('ABI updated for contract ' + action.data.account + ' at block #' + block.block_num);
+                if (this.processor.tracksContractAccount(action.data.account)) {
+                    logger.info('ABI updated for contract ' + action.data.account + ' at block #' + block.block_num);
+                }
             } catch (e) {
-                logger.info('ABI ' + action.data.account + ' already in cache. Ignoring ABI update');
+                if (this.processor.tracksContractAccount(action.data.account)) {
+                    logger.info('ABI ' + action.data.account + ' already in cache. Ignoring ABI update');
+                }
             }
         } else {
             logger.error('Could not update ABI for contract because action could not be deserialized');
@@ -433,9 +452,13 @@ export default class StateReceiver {
                     [action.data.account, block.block_num, eosioTimestampToDate(block.timestamp).getTime()]
                 );
 
-                logger.info('Code updated for contract ' + action.data.account + ' at block #' + block.block_num);
+                if (this.processor.tracksContractAccount(action.data.account)) {
+                    logger.info('Code updated for contract ' + action.data.account + ' at block #' + block.block_num);
+                }
             } catch (e) {
-                logger.info('Code ' + action.data.account + ' already in cache. Ignoring code update');
+                if (this.processor.tracksContractAccount(action.data.account)) {
+                    logger.info('Code ' + action.data.account + ' already in cache. Ignoring code update');
+                }
             }
         } else {
             logger.error('Could not update contract code because action could not be deserialized');

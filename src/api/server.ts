@@ -1,32 +1,37 @@
 import * as fs from 'fs';
-import * as express from 'express';
-import * as compression from 'compression';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+import express from 'express';
+import compression from 'compression';
 import {Server} from 'socket.io';
 import * as http from 'http';
 
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 
-import * as bodyParser from 'body-parser';
-import * as cors from 'cors';
+import bodyParser from 'body-parser';
+import cors from 'cors';
 import {Pool, QueryResult} from 'pg';
 
-import ConnectionManager from '../connections/manager';
-import {IServerConfig} from '../types/config';
-import logger from '../utils/winston';
-import {expressRedisCache, ExpressRedisCacheHandler} from '../utils/cache';
-import {eosioTimestampToDate} from '../utils/eosio';
-import * as swagger from 'swagger-ui-express';
-import {getOpenApiDescription, LogSchema} from './docs';
-import {respondApiError} from './utils';
-import {ActionHandler, ActionHandlerContext} from './actionhandler';
-import {ApiNamespace} from './namespaces/interfaces';
-import {mergeRequestData} from './namespaces/utils';
+import ConnectionManager from '../connections/manager.js';
+import {IServerConfig} from '../types/config.js';
+import logger from '../utils/winston.js';
+import {expressRedisCache, ExpressRedisCacheHandler} from '../utils/cache.js';
+import {eosioTimestampToDate} from '../utils/eosio.js';
+import swaggerUi from 'swagger-ui-express';
+import {getOpenApiDescription, LogSchema} from './docs.js';
+import {respondApiError} from './utils.js';
+import {ActionHandler, ActionHandlerContext} from './actionhandler.js';
+import {ApiNamespace} from './namespaces/interfaces.js';
+import {mergeRequestData} from './namespaces/utils.js';
 import {Send} from 'express-serve-static-core';
-import {GetInfoResult} from 'eosjs/dist/eosjs-rpc-interfaces';
-import { initListValidator } from './namespaces/lists';
+import {GetInfoResult} from 'eosjs/dist/eosjs-rpc-interfaces.js';
+import { initListValidator } from './namespaces/lists.js';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 const packageJson: any = require('../../package.json');
 
 export interface DB {
@@ -112,7 +117,7 @@ export class HTTPServer implements DB {
 export class WebServer {
     readonly express: express.Application;
 
-    readonly limiter: express.Handler;
+    readonly limiter?: express.Handler;
     readonly caching: ExpressRedisCacheHandler;
 
     private gitRevision?: string;
@@ -134,7 +139,7 @@ export class WebServer {
             }
             next();
         }));
-        this.express.use(compression());
+        this.express.use(compression() as unknown as express.RequestHandler);
 
         if (this.server.config.rate_limit) {
             const client = this.server.connection.redis.nodeRedis;
@@ -144,7 +149,8 @@ export class WebServer {
                 prefix: 'eosio-contract-api:' + server.connection.chain.name + ':rate-limit:'
             });
 
-            const keyGenerator = (req: express.Request): string => req.ip;
+            const keyGenerator = (req: express.Request): string =>
+                ipKeyGenerator(req.ip ?? '');
 
             this.limiter = rateLimit({
                 windowMs: this.server.config.rate_limit.interval * 1000,
@@ -217,11 +223,11 @@ export class WebServer {
                 const result = await handler(params, ctx);
 
                 res.json({success: true, data: result, query_time: Date.now()});
-            } catch (error) {
-                respondApiError(res, error);
+            } catch (error: unknown) {
+                respondApiError(res, error instanceof Error ? error : new Error(String(error)));
             }
         };
-    }
+    };
 
     private middleware(): void {
         this.express.use(bodyParser.json({limit: '10MB'}));
@@ -422,11 +428,17 @@ export class DocumentationServer {
     render(): void {
         const router = express.Router();
 
-        router.use('/docs', swagger.serve);
-        router.get('/docs', swagger.setup(this.documentation, {
-            customCss: '.topbar { display: none; }',
-            customCssUrl: 'https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-flattop.min.css'
-        }));
+        router.use(
+            '/docs',
+            ...(swaggerUi.serve as unknown as express.RequestHandler[])
+        );
+        router.get(
+            '/docs',
+            swaggerUi.setup(this.documentation, {
+                customCss: '.topbar { display: none; }',
+                customCssUrl: 'https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-flattop.min.css'
+            }) as unknown as express.RequestHandler
+        );
 
         this.server.web.express.use(router);
     }

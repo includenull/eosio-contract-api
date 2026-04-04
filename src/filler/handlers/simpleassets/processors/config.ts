@@ -1,10 +1,10 @@
-import { SimpleAssetsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioContractRow } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { TokenConfigsTableRow } from '../types/tables';
-import SimpleAssetsHandler from '../index';
+import { SimpleAssetsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioContractRow } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { TokenConfigsTableRow } from '../types/tables.js';
+import SimpleAssetsHandler from '../index.js';
 
 export function configProcessor(core: SimpleAssetsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

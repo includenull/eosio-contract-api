@@ -1,21 +1,21 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
+import { AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
 import {
     actionGreylistParameters,
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { greylistFilterParameters } from '../openapi';
+} from '../../../docs.js';
+import { greylistFilterParameters } from '../openapi.js';
 import {
     getCollectionAction, getCollectionLogsAction,
     getCollectionsAction, getCollectionSchemasAction,
     getCollectionsCountAction,
     getCollectionStatsAction
-} from '../handlers/collections';
+} from '../handlers/collections.js';
 
 export function collectionsEndpoints(core: AtomicAssetsNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

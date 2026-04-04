@@ -1,27 +1,27 @@
-import * as express from 'express';
+import express from 'express';
 
-import { AtomicAssetsContext, AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { RequestValues } from '../../utils';
-import { FillerHook, fillOffers } from '../filler';
+import { AtomicAssetsContext, AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { RequestValues } from '../../utils.js';
+import { FillerHook, fillOffers } from '../filler.js';
 import {
     actionGreylistParameters,
     dateBoundaryParameters,
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { OfferState } from '../../../../filler/handlers/atomicassets';
-import { greylistFilterParameters } from '../openapi';
+} from '../../../docs.js';
+import { OfferState } from '../../../../filler/handlers/atomicassets/index.js';
+import { greylistFilterParameters } from '../openapi.js';
 import {
     createSocketApiNamespace,
     extractNotificationIdentifiers,
-} from '../../../utils';
-import ApiNotificationReceiver from '../../../notification';
-import { NotificationData } from '../../../../filler/notifier';
-import { getOfferLogsCountAction, getOffersCountAction, getRawOffersAction } from '../handlers/offers';
-import { ApiError } from '../../../error';
-import { filterQueryArgs } from '../../validation';
+} from '../../../utils.js';
+import ApiNotificationReceiver from '../../../notification.js';
+import { NotificationData } from '../../../../filler/notifier.js';
+import { getOfferLogsCountAction, getOffersCountAction, getRawOffersAction } from '../handlers/offers.js';
+import { ApiError } from '../../../error.js';
+import { filterQueryArgs } from '../../validation.js';
 
 export class OfferApi {
     constructor(
@@ -55,7 +55,7 @@ export class OfferApi {
             offerResult.rows.map((row: any) => this.offerFormatter(offerLookup[row.offer_id])),
             this.assetFormatter, this.assetView, this.fillerHook
         );
-    }
+    };
 
     getOfferAction = async (params: RequestValues, ctx: AtomicAssetsContext): Promise<any> => {
         const args = await filterQueryArgs(ctx.pathParams, {
@@ -78,7 +78,7 @@ export class OfferApi {
         );
 
         return offers[0];
-    }
+    };
 
     endpoints(router: express.Router): any {
         const {caching, returnAsJSON} = this.server.web;

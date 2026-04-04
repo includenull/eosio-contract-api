@@ -1,4 +1,4 @@
-import { atomicassetsComponents, generateOfferSchema, generateTransferSchema } from '../atomicassets/openapi';
+import { atomicassetsComponents, generateOfferSchema, generateTransferSchema } from '../atomicassets/openapi.js';
 
 export const atomicmarketComponents = {
     ListingAsset: {

@@ -1,11 +1,11 @@
-import { ContractDBTransaction } from './database';
-import { ShipBlock } from '../types/ship';
-import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio';
-import logger from '../utils/winston';
-import { ModuleLoader } from './modules';
+import { ContractDBTransaction } from './database.js';
+import { ShipBlock } from '../types/ship.js';
+import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio.js';
+import logger from '../utils/winston.js';
+import { ModuleLoader } from './modules.js';
 
 export type TraceListener = (db: ContractDBTransaction, block: ShipBlock, tx: EosioTransaction, trace: EosioActionTrace<any>) => Promise<any>;
-export type DeltaListener = (db: ContractDBTransaction, block: ShipBlock, delta: EosioContractRow) => Promise<any>;
+export type DeltaListener = (db: ContractDBTransaction, block: ShipBlock, delta: EosioContractRow<any>) => Promise<any>;
 export type PriorityListener = (db: ContractDBTransaction) => Promise<any>;
 export type CommitListener = (db: ContractDBTransaction) => Promise<any>;
 export type CommittedListener = () => Promise<any>;
@@ -81,7 +81,10 @@ export default class DataProcessor {
         const listeners = this.getActiveListeners(deserialize);
 
         const contracts = this.getContracts(deserialize);
-        const result: any = contracts.reduce((prev, curr) => ({...prev, [curr]: {actions: [], tables: []}}), {});
+        const result: any = contracts.reduce<Record<string, {actions: string[], tables: string[]}>>(
+            (prev, curr) => ({...prev, [curr]: {actions: [], tables: []}}),
+            {}
+        );
 
         for (const listener of listeners.trace_listeners) {
             if (listener.action === '*') {
@@ -251,6 +254,21 @@ export default class DataProcessor {
             process: listeners.length > 0,
             deserialize: !!listeners.find(element => element.options.deserialize)
         };
+    }
+
+    /** True if any active listener watches this contract account (trace or table). */
+    tracksContractAccount(account: string): boolean {
+        const activeTrace = this.traceListeners.filter(
+            element => this.state === ProcessingState.HEAD || !element.options.headOnly
+        );
+        const activeTable = this.tableListeners.filter(
+            element => this.state === ProcessingState.HEAD || !element.options.headOnly
+        );
+
+        return (
+            activeTrace.some(element => element.contract === '*' || element.contract === account) ||
+            activeTable.some(element => element.contract === '*' || element.contract === account)
+        );
     }
 
     processActionTrace(block: ShipBlock, tx: EosioTransaction, trace: EosioActionTrace<any>): void {

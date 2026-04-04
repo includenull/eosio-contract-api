@@ -1,9 +1,9 @@
-import AtomicToolsHandler, { AtomicToolsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { ShipBlock } from '../../../../types/ship';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
-import { CancelLinkActionData, ClaimLinkActionData, LogLinkStartActionData, LogNewLinkActionData } from '../types/actions';
+import AtomicToolsHandler, { AtomicToolsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
+import { CancelLinkActionData, ClaimLinkActionData, LogLinkStartActionData, LogNewLinkActionData } from '../types/actions.js';
 
 export function logProcessor(core: AtomicToolsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

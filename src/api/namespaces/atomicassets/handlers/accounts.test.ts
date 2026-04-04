@@ -1,8 +1,7 @@
-import {expect} from 'chai';
 
-import {initAtomicAssetsTest} from '../test';
-import {getAccountAction, getAccountCollectionAction, getAccountsAction} from './accounts';
-import {formatCollection, formatSchema, formatTemplate} from '../format';
+import {initAtomicAssetsTest} from '../test.js';
+import {getAccountAction, getAccountCollectionAction, getAccountsAction} from './accounts.js';
+import {formatCollection, formatSchema, formatTemplate} from '../format.js';
 
 describe('Account handler', () => {
     const {client, txit} = initAtomicAssetsTest();
@@ -63,24 +62,24 @@ describe('Account handler', () => {
                 }
             });
 
-            expect(response.assets).to.equal('1');
+            expect(response.assets).toBe('1');
             expect(response.collections).length(1);
             const resCollection = response.collections[0];
-            expect(resCollection).to.deep.equal({
+            expect(resCollection).toEqual({
                 collection: formatCollection(collectionViewInfo.rows[0]),
                 assets: '1',
             });
 
             const resSchemas = response.schemas;
             expect(resSchemas).length(1);
-            expect(resSchemas[0]).to.deep.equal({
+            expect(resSchemas[0]).toEqual({
                 schema: formatSchema(schemaViewInfo.rows[0]),
                 assets: '1',
             });
 
             const resTemplates = response.templates;
             expect(resTemplates).length(1);
-            expect(resTemplates[0]).to.deep.equal({
+            expect(resTemplates[0]).toEqual({
                 template_id: template['template_id'],
                 template: formatTemplate(templateViewInfo.rows[0]),
                 assets: '1',
@@ -125,12 +124,12 @@ describe('Account handler', () => {
                 }
             });
 
-            expect(response.templates).to.deep.equal([
+            expect(response.templates).toEqual([
                 {template_id: template['template_id'], assets: '1'},
                 {template_id: null, assets: '1'},
             ]);
 
-            expect(response.schemas).to.deep.equal([
+            expect(response.schemas).toEqual([
                 {schema_name: asset1['schema_name'], assets: '1'},
                 {schema_name: asset2['schema_name'], assets: '1'}
             ]);
@@ -165,12 +164,12 @@ describe('Account handler', () => {
                 }
             });
 
-            expect(response.length).to.equal(2);
-            expect(response[0]).to.deep.equal({assets: '1', account: asset1['owner']});
-            expect(response[1]).to.deep.equal({assets: '1', account: asset2['owner']});
+            expect(response.length).toBe(2);
+            expect(response[0]).toEqual({assets: '1', account: asset1['owner']});
+            expect(response[1]).toEqual({assets: '1', account: asset2['owner']});
         });
 
-        context('when filter match_owner argument is given', () => {
+        describe('when filter match_owner argument is given', () => {
             txit('returns asset count filtered by owner', async () => {
                 const asset1 = await client.createAsset({
                     owner: 'account1',
@@ -195,12 +194,12 @@ describe('Account handler', () => {
                     }
                 });
 
-                expect(response.length).to.equal(1);
-                expect(response[0]).to.deep.equal({assets: '1', account: asset1['owner']});
+                expect(response.length).toBe(1);
+                expect(response[0]).toEqual({assets: '1', account: asset1['owner']});
             });
         });
 
-        context('when filter collection name is given', () => {
+        describe('when filter collection name is given', () => {
             txit('returns asset count filtered by collection name', async () => {
                 const asset1 = await client.createAsset({
                     owner: 'account1',
@@ -227,12 +226,12 @@ describe('Account handler', () => {
                     }
                 });
 
-                expect(response.length).to.equal(1);
-                expect(response[0]).to.deep.equal({assets: '1', account: asset1['owner']});
+                expect(response.length).toBe(1);
+                expect(response[0]).toEqual({assets: '1', account: asset1['owner']});
             });
         });
 
-        context('when filter schema name is given', () => {
+        describe('when filter schema name is given', () => {
             txit('returns asset count filtered by schema name', async () => {
                 const schema1 = await client.createSchema();
                 const schema2 = await client.createSchema();
@@ -262,12 +261,12 @@ describe('Account handler', () => {
                     }
                 });
 
-                expect(response.length).to.equal(1);
-                expect(response[0]).to.deep.equal({assets: '1', account: asset1['owner']});
+                expect(response.length).toBe(1);
+                expect(response[0]).toEqual({assets: '1', account: asset1['owner']});
             });
         });
 
-        context('when filter template id is given', () => {
+        describe('when filter template id is given', () => {
             txit('returns asset count filtered by schema name', async () => {
                 const template = await client.createTemplate();
                 const anotherTemplate = await client.createTemplate();
@@ -299,13 +298,13 @@ describe('Account handler', () => {
                     }
                 });
 
-                expect(response.length).to.equal(1);
-                expect(response[0]).to.deep.equal({assets: '1', account: asset1['owner']});
+                expect(response.length).toBe(1);
+                expect(response[0]).toEqual({assets: '1', account: asset1['owner']});
             });
         });
     });
 
-    after(async () => {
+    afterAll(async () => {
         await client.end();
     });
 });

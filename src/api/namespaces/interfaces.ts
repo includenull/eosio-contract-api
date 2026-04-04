@@ -1,7 +1,7 @@
-import * as express from 'express';
+import express from 'express';
 
-import ConnectionManager from '../../connections/manager';
-import { HTTPServer } from '../server';
+import ConnectionManager from '../../connections/manager.js';
+import { HTTPServer } from '../server.js';
 
 export abstract class ApiNamespace {
     static namespaceName = '';

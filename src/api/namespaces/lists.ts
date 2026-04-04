@@ -1,6 +1,6 @@
-import { DB } from '../server';
-import moize from 'moize';
-import { addValidationType, parseTypeString, validateId, validateName, validateString } from './validation';
+import { DB } from '../server.js';
+import { memoize } from 'micro-memoize';
+import { addValidationType, parseTypeString, validateId, validateName, validateString } from './validation.js';
 
 export async function expandLists(strings: string[], db: DB): Promise<string[]> {
     const result: string[] = [];
@@ -16,21 +16,24 @@ export async function expandLists(strings: string[], db: DB): Promise<string[]> 
     return result;
 }
 
-const getListItems = moize({
-    isPromise: true,
-    maxSize: 9999990,
-    maxArgs: 1,
-    maxAge: 1000 * 60 * 5,
-})(async (listName: string, db: DB): Promise<string[]> => {
-    const {items} = await db.fetchOne(`
-        SELECT ARRAY_AGG(item_name) items
-        FROM list_items
-            JOIN lists ON list_items.list_id = lists.id
-        WHERE lists.list_name = $1
-    `, [listName]);
+const getListItems = memoize(
+    async (listName: string, db: DB): Promise<string[]> => {
+        const {items} = await db.fetchOne(`
+            SELECT ARRAY_AGG(item_name) items
+            FROM list_items
+                JOIN lists ON list_items.list_id = lists.id
+            WHERE lists.list_name = $1
+        `, [listName]);
 
-    return items ?? [];
-});
+        return items ?? [];
+    },
+    {
+        async: true,
+        maxSize: 9999990,
+        maxArgs: 1,
+        expires: 1000 * 60 * 5,
+    }
+);
 
 export function initListValidator(db: DB): void {
     addValidationType('list', async (values, filter) => {

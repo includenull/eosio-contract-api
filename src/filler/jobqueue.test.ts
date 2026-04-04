@@ -1,7 +1,5 @@
-import 'mocha';
-import {expect} from 'chai';
 
-import {JobQueue, JobQueuePriority} from './jobqueue';
+import {JobQueue, JobQueuePriority} from './jobqueue.js';
 
 describe('JobQueue', () => {
 
@@ -26,9 +24,9 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
-            expect(called).to.equal(true);
+            expect(called).toBe(true);
         });
-    },);
+    });
 
     it('does not run 2 jobs with the same priority at the same time', async () => {
         await executeTestWithQueue(1, async (jq) => {
@@ -43,10 +41,10 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
-            expect(jq.active).to.equal(1);
+            expect(jq.active).toBe(1);
 
-            expect(calledJob1).to.equal(true);
-            expect(calledJob2).to.equal(false);
+            expect(calledJob1).toBe(true);
+            expect(calledJob2).toBe(false);
         });
     });
 
@@ -63,8 +61,8 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
-            expect(calledJob1At).to.be.greaterThan(now);
-            expect(calledJob1At).to.be.lessThanOrEqual(calledJob2At);
+            expect(calledJob1At.getTime()).toBeGreaterThan(now.getTime());
+            expect(calledJob1At.getTime()).toBeLessThanOrEqual(calledJob2At.getTime());
         });
     });
 
@@ -81,8 +79,8 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
-            expect(calledJob1).to.equal(true);
-            expect(calledJob2).to.equal(true);
+            expect(calledJob1).toBe(true);
+            expect(calledJob2).toBe(true);
         });
     });
 
@@ -97,7 +95,7 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 20));
 
-            expect(calledJob1).to.equal(1);
+            expect(calledJob1).toBe(1);
         });
     });
 
@@ -128,9 +126,9 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 20));
 
-            expect(calledJob1).to.greaterThan(1);
-            expect(err.error.message).to.equal('Stop');
-            expect(err.job.name).to.equal('Job1');
+            expect(calledJob1).toBeGreaterThan(1);
+            expect(err.error.message).toBe('Stop');
+            expect(err.job.name).toBe('Job1');
         });
     });
 
@@ -147,7 +145,7 @@ describe('JobQueue', () => {
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
-            expect(logs).to.deep.equal([
+            expect(logs).toEqual([
                 'Started job Test1',
                 'Ended job Test1',
             ]);

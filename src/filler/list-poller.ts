@@ -1,14 +1,13 @@
-import fetch from 'node-fetch';
-import { IListPollConfig } from '../types/config';
-import PostgresConnection from '../connections/postgres';
-import logger from '../utils/winston';
-import moize from 'moize';
+import { IListPollConfig } from '../types/config.js';
+import PostgresConnection from '../connections/postgres.js';
+import logger from '../utils/winston.js';
+import { memoize } from 'micro-memoize';
 
 const DEFAULT_POLL_FREQUENCY = 60 * 10; // 10 minutes
 
 export default class ListPoller {
 
-    private interval: NodeJS.Timer
+    private interval: NodeJS.Timer;
 
     constructor(
         private readonly config: IListPollConfig,
@@ -31,7 +30,7 @@ export default class ListPoller {
                 headers: {
                     'X-API-Key': this.config.api_key,
                 },
-                timeout: 1000 * 60 * 5,
+                signal: AbortSignal.timeout(1000 * 60 * 5),
             });
 
             if (!response.ok) {
@@ -104,13 +103,16 @@ type ListItem = {
     itemName: string
 }
 
-const getListId = moize({
-    isPromise: true,
-    maxSize: 9999990,
-    maxArgs: 1,
-})(async (listName: string, database: PostgresConnection): Promise<number> => {
-    return (
-        await database.fetchOne(`SELECT id FROM lists WHERE list_name = $1`, [listName])
-            ?? await database.fetchOne(`INSERT INTO lists (list_name) VALUES ($1) RETURNING id`, [listName])
-    ).id;
-});
+const getListId = memoize(
+    async (listName: string, database: PostgresConnection): Promise<number> => {
+        return (
+            await database.fetchOne(`SELECT id FROM lists WHERE list_name = $1`, [listName])
+                ?? await database.fetchOne(`INSERT INTO lists (list_name) VALUES ($1) RETURNING id`, [listName])
+        ).id;
+    },
+    {
+        async: true,
+        maxSize: 9999990,
+        maxArgs: 1,
+    }
+);

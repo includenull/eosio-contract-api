@@ -1,8 +1,9 @@
-import 'mocha';
-import ConnectionManager from '../connections/manager';
-import {ContractDB} from './database';
+import ConnectionManager from '../connections/manager.js';
+import {ContractDB} from './database.js';
+import { createRequire } from 'node:module';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const require = createRequire(import.meta.url);
+
 const config = require('../../config/connections.config.json');
 
 describe('database tests', () => {
@@ -77,7 +78,7 @@ describe('database tests', () => {
         await transaction.commit();
     });
 
-    after(async () => {
+    afterAll(async () => {
         await connection.redis.disconnect();
         await connection.database.pool.end();
     });

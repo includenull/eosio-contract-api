@@ -1,4 +1,4 @@
-import { DB } from '../../server';
+import { DB } from '../../server.js';
 
 export type FillerHook = (db: DB, contract: string, rows: any[]) => Promise<any[]>;
 

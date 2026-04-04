@@ -1,6 +1,6 @@
-import * as express from 'express';
-import QueryBuilder from '../builder';
-import {filterQueryArgs, FiltersDefinition, FilterValues} from './validation';
+import express from 'express';
+import QueryBuilder from '../builder.js';
+import {filterQueryArgs, FiltersDefinition, FilterValues} from './validation.js';
 
 export type SortColumn = {column: string, nullable?: boolean, numericIndex?: boolean};
 export type SortColumnMapping = {[key: string]: SortColumn};

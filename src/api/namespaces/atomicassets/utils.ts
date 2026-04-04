@@ -1,8 +1,8 @@
-import {OfferState} from '../../../filler/handlers/atomicassets';
-import QueryBuilder from '../../builder';
-import {filterQueryArgs, FiltersDefinition, FilterValues} from '../validation';
-import moize from 'moize';
-import { AtomicAssetsContext } from './index';
+import {OfferState} from '../../../filler/handlers/atomicassets/index.js';
+import QueryBuilder from '../../builder.js';
+import {filterQueryArgs, FiltersDefinition, FilterValues} from '../validation.js';
+import { memoize } from 'micro-memoize';
+import { AtomicAssetsContext } from './index.js';
 
 export function hasAssetFilter(values: FilterValues, blacklist: string[] = []): boolean {
     return Object.keys(values)
@@ -44,22 +44,25 @@ async function hasStrongCollectionSchemaFilter(collection_names: string[], schem
     return true;
 }
 
-const getSchemaAssetCount = moize({
-    isPromise: true,
-    maxAge: 1000 * 60 * 60 * 24,
-    maxArgs: 2,
-    maxSize: 1_000_000,
-})(async (collection_name: string, schema_name: string | null, ctx: AtomicAssetsContext): Promise<number> => {
-    const {ct} = await ctx.db.fetchOne(`
-        SELECT SUM(owned)::INT ct
-        FROM atomicassets_asset_counts
-        WHERE contract = $1 
-            AND (collection_name = $2)
-            AND (schema_name = $3 OR $3 IS NULL)
-    `, [ctx.coreArgs.atomicassets_account, collection_name, schema_name]);
+const getSchemaAssetCount = memoize(
+    async (collection_name: string, schema_name: string | null, ctx: AtomicAssetsContext): Promise<number> => {
+        const {ct} = await ctx.db.fetchOne(`
+            SELECT SUM(owned)::INT ct
+            FROM atomicassets_asset_counts
+            WHERE contract = $1 
+                AND (collection_name = $2)
+                AND (schema_name = $3 OR $3 IS NULL)
+        `, [ctx.coreArgs.atomicassets_account, collection_name, schema_name]);
 
-    return ct;
-});
+        return ct;
+    },
+    {
+        async: true,
+        expires: 1000 * 60 * 60 * 24,
+        maxArgs: 2,
+        maxSize: 1_000_000,
+    }
+);
 
 export function hasDataFilters(values: FilterValues): boolean {
     const keys = Object.keys(values);

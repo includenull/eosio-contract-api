@@ -1,15 +1,15 @@
 import PQueue from 'p-queue';
 import { Serialize } from 'eosjs';
-import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces';
-import * as WebSocket from 'ws';
+import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
+import WebSocket from 'ws';
 import { StaticPool } from 'node-worker-threads-pool';
 
-import logger from '../utils/winston';
+import logger from '../utils/winston.js';
 import {
     BlockRequestType,
     IBlockReaderOptions, ShipBlockResponse
-} from '../types/ship';
-import { deserializeEosioType, serializeEosioType } from '../utils/eosio';
+} from '../types/ship.js';
+import { deserializeEosioType, serializeEosioType } from '../utils/eosio.js';
 
 export type BlockConsumer = (block: ShipBlockResponse) => any;
 
@@ -54,7 +54,7 @@ export default class StateHistoryBlockReader {
         this.deltaWhitelist = [];
     }
 
-    setOptions(options?: IBlockReaderOptions, deltas?: string[]): void {
+    setOptions(options?: Partial<IBlockReaderOptions>, deltas?: string[]): void {
         if (options) {
             this.options = {...this.options, ...options};
         }
@@ -96,6 +96,10 @@ export default class StateHistoryBlockReader {
         this.ws.send(serializeEosioType('request', request, this.types));
     }
 
+    setMinBlockConfirmation(minBlockConfirmation: number): void {
+        this.options.min_block_confirmation = Math.max(1, minBlockConfirmation);
+    }
+
     onConnect(): void {
         this.connected = true;
         this.connecting = false;
@@ -113,7 +117,7 @@ export default class StateHistoryBlockReader {
                     this.deserializeWorkers = new StaticPool({
                         size: this.options.ds_threads,
                         task: './build/workers/deserializer.js',
-                        workerData: {abi: data}
+                        workerData: {abi: this.abi}
                     });
                 }
 

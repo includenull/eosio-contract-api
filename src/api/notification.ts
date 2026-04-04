@@ -1,6 +1,6 @@
-import { NotificationData } from '../filler/notifier';
-import ConnectionManager from '../connections/manager';
-import logger from '../utils/winston';
+import { NotificationData } from '../filler/notifier.js';
+import ConnectionManager from '../connections/manager.js';
+import logger from '../utils/winston.js';
 
 export type NotificationListener = (notifications: NotificationData[]) => Promise<any>;
 

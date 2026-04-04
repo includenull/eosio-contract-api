@@ -1,19 +1,19 @@
-import * as express from 'express';
+import express from 'express';
 
 import {
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { baseAssetFilterParameters, greylistFilterParameters, hideOffersParameters } from '../openapi';
+} from '../../../docs.js';
+import { AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { baseAssetFilterParameters, greylistFilterParameters, hideOffersParameters } from '../openapi.js';
 import {
     getAccountAction,
     getAccountCollectionAction,
     getAccountsAction,
     getAccountsCountAction
-} from '../handlers/accounts';
+} from '../handlers/accounts.js';
 
 export function accountsEndpoints(core: AtomicAssetsNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

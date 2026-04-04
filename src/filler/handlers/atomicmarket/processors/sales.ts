@@ -1,15 +1,15 @@
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import AtomicMarketHandler, { AtomicMarketUpdatePriority, SaleState } from '../index';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import AtomicMarketHandler, { AtomicMarketUpdatePriority, SaleState } from '../index.js';
 import {
     CancelSaleActionData,
     LogNewSaleActionData, LogSaleStartActionData, PurchaseSaleActionData
-} from '../types/actions';
-import { preventInt64Overflow } from '../../../../utils/binary';
-import ApiNotificationSender from '../../../notifier';
+} from '../types/actions.js';
+import { preventInt64Overflow } from '../../../../utils/binary.js';
+import ApiNotificationSender from '../../../notifier.js';
 
 export function saleProcessor(core: AtomicMarketHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

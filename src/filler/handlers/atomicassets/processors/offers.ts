@@ -1,17 +1,17 @@
-import AtomicAssetsHandler, { AtomicAssetsUpdatePriority, OfferState } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
+import AtomicAssetsHandler, { AtomicAssetsUpdatePriority, OfferState } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
 import {
     AcceptOfferActionData,
     CancelOfferActionData,
     DeclineOfferActionData, LogBurnAssetActionData,
     LogNewOfferActionData,
     LogTransferActionData
-} from '../types/actions';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import ApiNotificationSender from '../../../notifier';
+} from '../types/actions.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import ApiNotificationSender from '../../../notifier.js';
 
 export function offerProcessor(core: AtomicAssetsHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

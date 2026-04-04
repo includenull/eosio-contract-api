@@ -1,14 +1,14 @@
-import * as express from 'express';
+import express from 'express';
 
 import {
     getOpenAPI3Responses,
     getPrimaryBoundaryParams,
     paginationParameters,
-} from '../../../docs';
-import { AtomicAssetsNamespace } from '../index';
-import { HTTPServer } from '../../../server';
-import { baseAssetFilterParameters, greylistFilterParameters, hideOffersParameters } from '../openapi';
-import { getBurnsAccountAction, getBurnsAction } from '../handlers/burns';
+} from '../../../docs.js';
+import { AtomicAssetsNamespace } from '../index.js';
+import { HTTPServer } from '../../../server.js';
+import { baseAssetFilterParameters, greylistFilterParameters, hideOffersParameters } from '../openapi.js';
+import { getBurnsAccountAction, getBurnsAction } from '../handlers/burns.js';
 
 export function burnEndpoints(core: AtomicAssetsNamespace, server: HTTPServer, router: express.Router): any {
     const {caching, returnAsJSON} = server.web;

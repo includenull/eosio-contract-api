@@ -1,10 +1,10 @@
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { EosioContractRow } from '../../../../types/eosio';
-import { ShipBlock } from '../../../../types/ship';
-import { eosioTimestampToDate } from '../../../../utils/eosio';
-import { MarketplacesTableRow } from '../types/tables';
-import AtomicMarketHandler, { AtomicMarketUpdatePriority } from '../index';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { EosioContractRow } from '../../../../types/eosio.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { eosioTimestampToDate } from '../../../../utils/eosio.js';
+import { MarketplacesTableRow } from '../types/tables.js';
+import AtomicMarketHandler, { AtomicMarketUpdatePriority } from '../index.js';
 
 export function marketplaceProcessor(core: AtomicMarketHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

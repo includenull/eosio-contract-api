@@ -1,4 +1,4 @@
-import { HTTPServer } from './server';
+import { HTTPServer } from './server.js';
 
 export function getOpenApiDescription(server: HTTPServer): string {
     return '### EOSIO Contract API\n' +

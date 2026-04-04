@@ -1,12 +1,12 @@
-import * as express from 'express';
+import express from 'express';
 
-import { ApiNamespace } from '../interfaces';
-import { HTTPServer } from '../../server';
-import { atomictoolsComponents } from './openapi';
-import { configEndpoints } from './routes/config';
-import { linksEndpoints } from './routes/links';
-import { ActionHandlerContext } from '../../actionhandler';
-import { ILimits } from '../../../types/config';
+import { ApiNamespace } from '../interfaces.js';
+import { HTTPServer } from '../../server.js';
+import { atomictoolsComponents } from './openapi.js';
+import { configEndpoints } from './routes/config.js';
+import { linksEndpoints } from './routes/links.js';
+import { ActionHandlerContext } from '../../actionhandler.js';
+import { ILimits } from '../../../types/config.js';
 
 export type AtomicToolsNamespaceArgs = {
     atomictools_account: string,

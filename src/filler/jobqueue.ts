@@ -18,7 +18,7 @@ export class JobQueue extends EventEmitter {
 
     private readonly jobs: Array<Job> = [];
 
-    private pulseID: NodeJS.Timer;
+    private pulseID: ReturnType<typeof setInterval> | null = null;
     private readonly pulseInterval: number;
     private runningPriorities: Array<number> = [];
 
@@ -81,7 +81,9 @@ export class JobQueue extends EventEmitter {
     }
 
     stop(): void {
-        clearInterval(this.pulseID);
+        if (this.pulseID !== null) {
+            clearInterval(this.pulseID);
+        }
         this.pulseID = null;
         this.jobs.length = 0;
     }

@@ -1,25 +1,23 @@
-import 'mocha';
-import { expect } from 'chai';
-import { deserializeUInt, serializeUInt } from './binary';
-import { deserializeEosioName, serializeEosioName } from './eosio';
+import { deserializeUInt, serializeUInt } from './binary.js';
+import { deserializeEosioName, serializeEosioName } from './eosio.js';
 
 describe('binary utility', () => {
     it('uint serialization', async () => {
         const unsignedNumber = BigInt(0xFF00_0000);
         const signedNumber = BigInt(-16777216);
 
-        expect(serializeUInt(unsignedNumber, 4).toString(10)).to.equal(signedNumber.toString(10));
-        expect(deserializeUInt(signedNumber, 4).toString(10)).to.equal(unsignedNumber.toString(10));
+        expect(serializeUInt(unsignedNumber, 4).toString(10)).toBe(signedNumber.toString(10));
+        expect(deserializeUInt(signedNumber, 4).toString(10)).toBe(unsignedNumber.toString(10));
     });
 
     it('eosio name serialization', async () => {
-        expect(serializeEosioName('eosio').toString()).to.equal('15347797');
-        expect(deserializeEosioName('15347797').toString()).to.equal('eosio');
+        expect(serializeEosioName('eosio').toString()).toBe('15347797');
+        expect(deserializeEosioName('15347797').toString()).toBe('eosio');
 
-        expect(serializeEosioName('eosio.token').toString()).to.equal('46868006049558613');
-        expect(deserializeEosioName('46868006049558613').toString()).to.equal('eosio.token');
+        expect(serializeEosioName('eosio.token').toString()).toBe('46868006049558613');
+        expect(deserializeEosioName('46868006049558613').toString()).toBe('eosio.token');
 
-        expect(serializeEosioName('pinknetworkx').toString()).to.equal('-3395250964074485845');
-        expect(deserializeEosioName('-3395250964074485845').toString()).to.equal('pinknetworkx');
+        expect(serializeEosioName('pinknetworkx').toString()).toBe('-3395250964074485845');
+        expect(deserializeEosioName('-3395250964074485845').toString()).toBe('pinknetworkx');
     });
 });

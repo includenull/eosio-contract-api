@@ -1,9 +1,9 @@
-import AtomicToolsHandler, { AtomicToolsUpdatePriority } from '../index';
-import DataProcessor from '../../../processor';
-import { ContractDBTransaction } from '../../../database';
-import { ShipBlock } from '../../../../types/ship';
-import { EosioContractRow } from '../../../../types/eosio';
-import { ConfigTableRow } from '../types/tables';
+import AtomicToolsHandler, { AtomicToolsUpdatePriority } from '../index.js';
+import DataProcessor from '../../../processor.js';
+import { ContractDBTransaction } from '../../../database.js';
+import { ShipBlock } from '../../../../types/ship.js';
+import { EosioContractRow } from '../../../../types/eosio.js';
+import { ConfigTableRow } from '../types/tables.js';
 
 export function configProcessor(core: AtomicToolsHandler, processor: DataProcessor): () => any {
     const destructors: Array<() => any> = [];

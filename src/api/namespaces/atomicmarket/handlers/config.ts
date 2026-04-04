@@ -1,6 +1,6 @@
-import { RequestValues } from '../../utils';
-import { AtomicMarketContext } from '../index';
-import { ApiError } from '../../../error';
+import { RequestValues } from '../../utils.js';
+import { AtomicMarketContext } from '../index.js';
+import { ApiError } from '../../../error.js';
 
 export async function getConfigAction(params: RequestValues, ctx: AtomicMarketContext): Promise<any> {
     const configQuery = await ctx.db.query(
