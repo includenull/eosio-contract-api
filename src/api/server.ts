@@ -10,7 +10,6 @@ import * as http from 'http';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 
-import bodyParser from 'body-parser';
 import cors from 'cors';
 import {Pool, QueryResult} from 'pg';
 
@@ -142,10 +141,10 @@ export class WebServer {
         this.express.use(compression() as unknown as express.RequestHandler);
 
         if (this.server.config.rate_limit) {
-            const client = this.server.connection.redis.nodeRedis;
+            const client = this.server.connection.redis.ioRedis;
 
             const store = new RedisStore({
-                sendCommand: (...args: string[]): any => client.sendCommand(args),
+                sendCommand: (...args: string[]): any => client.call(args[0], ...args.slice(1)),
                 prefix: 'eosio-contract-api:' + server.connection.chain.name + ':rate-limit:'
             });
 
@@ -194,7 +193,7 @@ export class WebServer {
         }
 
         this.caching = expressRedisCache(
-            this.server.connection.redis.nodeRedis,
+            this.server.connection.redis.ioRedis,
             'eosio-contract-api:' + this.server.connection.chain.name + ':express-cache:',
             this.server.config.cache_life || 0,
             this.server.config.ip_whitelist || []
@@ -230,8 +229,8 @@ export class WebServer {
     };
 
     private middleware(): void {
-        this.express.use(bodyParser.json({limit: '10MB'}));
-        this.express.use(bodyParser.urlencoded({extended: false, limit: '10MB'}));
+        this.express.use(express.json({ limit: '10MB' }));
+        this.express.use(express.urlencoded({ extended: false, limit: '10MB' }));
         this.express.use(cors({allowedHeaders: '*'}));
 
         this.express.use((req, res, next) => {

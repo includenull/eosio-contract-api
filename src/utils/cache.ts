@@ -1,6 +1,6 @@
 import express from 'express';
 import * as crypto from 'crypto';
-import { RedisClientType } from 'redis';
+import type Redis from 'ioredis';
 
 import logger from './winston.js';
 import { mergeRequestData } from '../api/namespaces/utils.js';
@@ -16,7 +16,7 @@ export type ExpressRedisCacheOptions = {
 export type ExpressRedisCacheHandler = (options?: ExpressRedisCacheOptions) => express.RequestHandler;
 
 export function expressRedisCache(
-    redis: RedisClientType<any, any>, prefix: string, expire: number, whitelistedIPs?: string[]
+    redis: Pick<Redis, 'get' | 'set' | 'expire'>, prefix: string, expire: number, whitelistedIPs?: string[]
 ): ExpressRedisCacheHandler {
     return (options: ExpressRedisCacheOptions = {}) => {
         return (req: express.Request, res: express.Response, next: express.NextFunction): void => {

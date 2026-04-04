@@ -1,21 +1,16 @@
 import Redis from 'ioredis';
-import { createClient, RedisClientType } from 'redis';
 
 export default class RedisConnection {
+    /** General commands: cache, rate limit, publish, ping. */
     readonly ioRedis: Redis;
+    /** Dedicated pub/sub subscriber (must not share connection with command traffic). */
     readonly ioRedisSub: Redis;
-
-    readonly nodeRedis: RedisClientType<any, any>;
-    readonly nodeRedisSub: RedisClientType<any, any>;
 
     private initialized = false;
 
     constructor(host: string, port: number) {
         this.ioRedis = new Redis({ host, port });
-        this.ioRedisSub = new Redis({ host, port });
-
-        this.nodeRedis = createClient({ url: `redis://${host}:${port}` });
-        this.nodeRedisSub = createClient({ url: `redis://${host}:${port}` });
+        this.ioRedisSub = this.ioRedis.duplicate();
     }
 
     async connect(): Promise<void> {
@@ -23,22 +18,15 @@ export default class RedisConnection {
             return;
         }
 
-        await this.nodeRedis.connect();
-        await this.nodeRedisSub.connect();
+        await this.ioRedis.ping();
+        await this.ioRedisSub.ping();
 
         this.initialized = true;
     }
 
     async disconnect(): Promise<void> {
-        if (this.nodeRedis.isOpen) {
-            await this.nodeRedis.disconnect();
-        }
-        if (this.nodeRedisSub.isOpen) {
-            await this.nodeRedisSub.disconnect();
-        }
-
-        await this.ioRedis.disconnect();
-        await this.ioRedisSub.disconnect();
+        await this.ioRedisSub.quit();
+        await this.ioRedis.quit();
     }
 
 }
