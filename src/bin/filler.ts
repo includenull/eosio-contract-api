@@ -5,7 +5,7 @@ import express from 'express';
 
 import Filler from '../filler/filler.js';
 import ConnectionManager from '../connections/manager.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import {IConnectionsConfig, IReaderConfig} from '../types/config.js';
 import {upgradeDb} from '../filler/upgrade-db.js';
 import {MetricsCollectorHandler} from '../metrics/handler.js';

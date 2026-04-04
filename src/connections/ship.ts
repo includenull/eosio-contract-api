@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import Piscina from 'piscina';
 import PQueue from 'p-queue';
@@ -5,7 +6,7 @@ import { Serialize } from 'eosjs';
 import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
 import WebSocket from 'ws';
 
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import {
     BlockRequestType,
     IBlockReaderOptions, ShipBlockResponse
@@ -115,11 +116,25 @@ export default class StateHistoryBlockReader {
                 this.types = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), this.abi);
 
                 if (this.options.ds_threads > 0) {
+                    const requested = Math.floor(Number(this.options.ds_threads));
+                    const cpus = availableParallelism() || 4;
+                    const poolSize = Math.max(1, Math.min(requested, cpus));
+
                     this.deserializeWorkers = new Piscina({
                         filename: fileURLToPath(new URL('../workers/deserializer.js', import.meta.url)),
-                        maxThreads: this.options.ds_threads,
+                        minThreads: poolSize,
+                        maxThreads: poolSize,
+                        idleTimeout: Infinity,
                         workerData: {abi: this.abi}
                     });
+
+                    if (poolSize !== requested) {
+                        logger.warn(
+                            `Deserialize pool capped to ${poolSize} workers (${requested} requested, ${cpus} CPUs available)`
+                        );
+                    } else {
+                        logger.info(`Deserialize worker pool: ${poolSize} threads`);
+                    }
                 }
 
                 for (const table of this.abi.tables) {

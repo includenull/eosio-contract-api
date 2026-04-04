@@ -1,6 +1,6 @@
 import { upgradeDb } from '../filler/upgrade-db.js';
 import PostgresConnection from '../connections/postgres.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { IConnectionsConfig } from '../types/config.js';
 import { createRequire } from 'node:module';
 

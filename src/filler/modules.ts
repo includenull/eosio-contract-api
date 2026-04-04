@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio.js';
 import { ShipBlock } from '../types/ship.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);

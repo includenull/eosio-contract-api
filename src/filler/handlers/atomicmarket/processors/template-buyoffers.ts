@@ -11,7 +11,7 @@ import {
     LogNewTemplateBuyofferActionData
 } from '../types/actions.js';
 import { preventInt64Overflow } from '../../../../utils/binary.js';
-import logger from '../../../../utils/winston.js';
+import logger from '../../../../utils/logger.js';
 
 export function templateBuyofferProcessor(core: AtomicMarketHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

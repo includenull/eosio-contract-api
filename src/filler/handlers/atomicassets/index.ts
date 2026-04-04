@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { PoolClient } from 'pg';
 
 import { ContractHandler } from '../interfaces.js';
-import logger from '../../../utils/winston.js';
+import logger from '../../../utils/logger.js';
 import { ConfigTableRow, TokenConfigsTableRow } from './types/tables.js';
 import DataProcessor from '../../processor.js';
 import ApiNotificationSender from '../../notifier.js';

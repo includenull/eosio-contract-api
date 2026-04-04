@@ -1,5 +1,5 @@
 import ConnectionManager from '../connections/manager.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { IConnectionsConfig, IServerConfig } from '../types/config.js';
 import Api from '../api/api.js';
 import {MetricsServer} from '../metrics/server.js';

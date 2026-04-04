@@ -2,7 +2,7 @@ import * as os from 'os';
 import express from 'express';
 import {Registry} from 'prom-client';
 
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import ConnectionManager from '../connections/manager.js';
 import {ICollectOptions, MetricsCollectorHandler} from './handler.js';
 

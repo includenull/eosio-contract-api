@@ -7,7 +7,7 @@ import AtomicMarketHandler, { AtomicMarketUpdatePriority, BuyofferState } from '
 import ApiNotificationSender from '../../../notifier.js';
 import { AcceptBuyofferActionData, CancelBuyofferActionData, DeclineBuyofferActionData, LogNewBuyofferActionData } from '../types/actions.js';
 import { preventInt64Overflow } from '../../../../utils/binary.js';
-import logger from '../../../../utils/winston.js';
+import logger from '../../../../utils/logger.js';
 
 export function buyofferProcessor(core: AtomicMarketHandler, processor: DataProcessor, notifier: ApiNotificationSender): () => any {
     const destructors: Array<() => any> = [];

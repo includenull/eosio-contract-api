@@ -1,4 +1,4 @@
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import * as fs from 'fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';

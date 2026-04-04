@@ -1,6 +1,6 @@
 import ConnectionManager from '../connections/manager.js';
 import StateReceiver from './receiver.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { IReaderConfig } from '../types/config.js';
 import { formatSecondsLeft } from '../utils/time.js';
 import { getHandlers } from './handlers/index.js';

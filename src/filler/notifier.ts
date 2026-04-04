@@ -2,7 +2,7 @@ import DataProcessor, { ProcessingState } from './processor.js';
 import { ShipBlock } from '../types/ship.js';
 import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio.js';
 import ConnectionManager from '../connections/manager.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { arrayChunk } from '../utils/index.js';
 
 export type NotificationData = {

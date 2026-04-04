@@ -1,7 +1,7 @@
 import { ContractDBTransaction } from './database.js';
 import { ShipBlock } from '../types/ship.js';
 import { EosioActionTrace, EosioContractRow, EosioTransaction } from '../types/eosio.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { ModuleLoader } from './modules.js';
 
 export type TraceListener = (db: ContractDBTransaction, block: ShipBlock, tx: EosioTransaction, trace: EosioActionTrace<any>) => Promise<any>;

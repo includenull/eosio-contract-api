@@ -4,7 +4,7 @@ import express from 'express';
 import {DB, HTTPServer} from './server.js';
 import {NotificationData} from '../filler/notifier.js';
 import {ApiError} from './error.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 
 export async function getContractActionLogs(
     db: DB, contract: string, actions: string[], condition: { [key: string]: any },

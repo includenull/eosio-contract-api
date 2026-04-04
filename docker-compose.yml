@@ -4,6 +4,7 @@ services:
     build: .
     command: yarn run start:filler
     restart: on-failure
+    stop_grace_period: 60s
     depends_on:
       eosio-contract-api-postgres:
         condition: service_healthy
@@ -18,6 +19,7 @@ services:
     build: .
     command: yarn run start:server
     restart: on-failure
+    stop_grace_period: 60s
     ports:
       - "9000:9000"
       - "127.0.0.1:9010:9010"
@@ -50,6 +52,8 @@ services:
     container_name: eosio-contract-api-postgres
     image: postgres:18
     restart: on-failure
+    # Official image uses SIGINT (fast shutdown + checkpoint). Default 10s stop often ends in SIGKILL before PG finishes.
+    stop_grace_period: 120s
     shm_size: '8gb'
     environment:
       - 'POSTGRES_USER=root'
@@ -63,7 +67,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     networks:
       - eosio-contract-api
 networks:

@@ -2,7 +2,7 @@ import express from 'express';
 import * as crypto from 'crypto';
 import type Redis from 'ioredis';
 
-import logger from './winston.js';
+import logger from './logger.js';
 import { mergeRequestData } from '../api/namespaces/utils.js';
 
 

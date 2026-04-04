@@ -1,7 +1,7 @@
 import { Pool, PoolClient, PoolConfig, QueryResult } from 'pg';
 // @ts-ignore
 import asyncExitHook from 'async-exit-hook';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 
 export default class PostgresConnection {
     readonly pool: Pool;

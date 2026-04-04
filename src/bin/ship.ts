@@ -1,6 +1,6 @@
 import StateHistoryBlockReader from '../connections/ship.js';
 import { ShipBlockResponse } from '../types/ship.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 
 const ship = new StateHistoryBlockReader('ws://127.0.0.1:8080', {
     min_block_confirmation: 1,

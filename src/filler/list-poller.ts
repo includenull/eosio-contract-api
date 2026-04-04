@@ -1,6 +1,6 @@
 import { IListPollConfig } from '../types/config.js';
 import PostgresConnection from '../connections/postgres.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { memoize } from 'micro-memoize';
 
 const DEFAULT_POLL_FREQUENCY = 60 * 10; // 10 minutes

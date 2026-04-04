@@ -6,7 +6,7 @@ import ConnectionManager from '../connections/manager.js';
 import { ShipBlock } from '../types/ship.js';
 import { eosioTimestampToDate } from '../utils/eosio.js';
 import { arrayChunk, arraysEqual } from '../utils/index.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { EosioActionTrace, EosioTransaction } from '../types/eosio.js';
 import { encodeDatabaseJson } from './utils.js';
 

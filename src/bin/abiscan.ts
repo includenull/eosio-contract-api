@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import ConnectionManager from '../connections/manager.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { IConnectionsConfig } from '../types/config.js';
 
 const require = createRequire(import.meta.url);

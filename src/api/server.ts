@@ -15,7 +15,7 @@ import {Pool, QueryResult} from 'pg';
 
 import ConnectionManager from '../connections/manager.js';
 import {IServerConfig} from '../types/config.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import {expressRedisCache, ExpressRedisCacheHandler} from '../utils/cache.js';
 import {eosioTimestampToDate} from '../utils/eosio.js';
 import swaggerUi from 'swagger-ui-express';

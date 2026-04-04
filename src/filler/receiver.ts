@@ -2,7 +2,7 @@ import { Serialize } from 'eosjs';
 import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
 import PQueue from 'p-queue';
 
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import ConnectionManager from '../connections/manager.js';
 import StateHistoryBlockReader from '../connections/ship.js';
 import { IReaderConfig } from '../types/config.js';
@@ -81,7 +81,7 @@ export default class StateReceiver {
 
         this.ship = connection.createShipBlockReader({
             min_block_confirmation: config.ship_min_block_confirmation,
-            ds_threads: config.ds_ship_threads,
+            ds_threads: config.ds_ship_threads ?? 4,
             allow_empty_deltas: false,
             allow_empty_traces: false,
             allow_empty_blocks: false

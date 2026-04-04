@@ -1,14 +1,14 @@
 import { workerData } from 'node:worker_threads';
 import { Serialize } from 'eosjs';
 
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 import { deserializeEosioType } from '../utils/eosio.js';
 
 type DeserializeRow = { type: string; data: Uint8Array | string | null; abi?: any };
 
 const args = workerData as { abi: any };
 
-logger.info('Launching deserialization worker...');
+logger.debug('Deserialization worker ready');
 
 const eosjsTypes: any = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), args.abi);
 

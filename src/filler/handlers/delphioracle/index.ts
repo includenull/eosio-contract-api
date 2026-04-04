@@ -5,7 +5,7 @@ import { ContractHandler } from '../interfaces.js';
 import { ShipBlock } from '../../../types/ship.js';
 import { EosioContractRow } from '../../../types/eosio.js';
 import { ContractDBTransaction } from '../../database.js';
-import logger from '../../../utils/winston.js';
+import logger from '../../../utils/logger.js';
 import { eosioTimestampToDate } from '../../../utils/eosio.js';
 import Filler from '../../filler.js';
 import DataProcessor from '../../processor.js';

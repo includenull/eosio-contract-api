@@ -1,6 +1,6 @@
 import {Gauge, Registry} from 'prom-client';
 import ConnectionManager from '../connections/manager.js';
-import logger from '../utils/winston.js';
+import logger from '../utils/logger.js';
 
 interface IMetrics {
     psql_connection?: Gauge<any>,
