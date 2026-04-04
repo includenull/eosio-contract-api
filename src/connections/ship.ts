@@ -1,8 +1,9 @@
+import { fileURLToPath } from 'node:url';
+import Piscina from 'piscina';
 import PQueue from 'p-queue';
 import { Serialize } from 'eosjs';
 import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
 import WebSocket from 'ws';
-import { StaticPool } from 'node-worker-threads-pool';
 
 import logger from '../utils/winston.js';
 import {
@@ -29,7 +30,7 @@ export default class StateHistoryBlockReader {
     private connecting: boolean;
     private stopped: boolean;
 
-    private deserializeWorkers: StaticPool<(x: Array<{type: string, data: Uint8Array, abi?: any}>) => any>;
+    private deserializeWorkers: Piscina | undefined;
 
     private unconfirmed: number;
     private consumer: BlockConsumer;
@@ -114,9 +115,9 @@ export default class StateHistoryBlockReader {
                 this.types = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), this.abi);
 
                 if (this.options.ds_threads > 0) {
-                    this.deserializeWorkers = new StaticPool({
-                        size: this.options.ds_threads,
-                        task: './build/workers/deserializer.js',
+                    this.deserializeWorkers = new Piscina({
+                        filename: fileURLToPath(new URL('../workers/deserializer.js', import.meta.url)),
+                        maxThreads: this.options.ds_threads,
                         workerData: {abi: this.abi}
                     });
                 }
@@ -303,7 +304,7 @@ export default class StateHistoryBlockReader {
 
         if (this.deserializeWorkers) {
             await this.deserializeWorkers.destroy();
-            this.deserializeWorkers = null;
+            this.deserializeWorkers = undefined;
         }
 
         this.reconnect();
@@ -378,13 +379,14 @@ export default class StateHistoryBlockReader {
 
     private async deserializeParallel(type: string, data: Uint8Array): Promise<any> {
         if (this.options.ds_threads > 0) {
-            const result = await this.deserializeWorkers.exec([{type, data}]);
-
-            if (result.success) {
-                return result.data[0];
+            const pool = this.deserializeWorkers;
+            if (!pool) {
+                throw new Error('Piscina deserialize pool not initialized');
             }
 
-            throw new Error(result.message);
+            const batch = await pool.run([{type, data}]);
+
+            return batch[0];
         }
 
         return deserializeEosioType(type, data, this.types);
@@ -392,13 +394,12 @@ export default class StateHistoryBlockReader {
 
     private async deserializeArrayParallel(rows: Array<{type: string, data: Uint8Array}>): Promise<any> {
         if (this.options.ds_threads > 0) {
-            const result = await this.deserializeWorkers.exec(rows);
-
-            if (result.success) {
-                return result.data;
+            const pool = this.deserializeWorkers;
+            if (!pool) {
+                throw new Error('Piscina deserialize pool not initialized');
             }
 
-            throw new Error(result.message);
+            return await pool.run(rows);
         }
 
         return rows.map(row => deserializeEosioType(row.type, row.data, this.types));
