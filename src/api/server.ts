@@ -25,7 +25,10 @@ import {ActionHandler, ActionHandlerContext} from './actionhandler.js';
 import {ApiNamespace} from './namespaces/interfaces.js';
 import {mergeRequestData} from './namespaces/utils.js';
 import {Send} from 'express-serve-static-core';
-import {GetInfoResult} from 'eosjs/dist/eosjs-rpc-interfaces.js';
+type ChainHealthInfo = {
+    head_block_num: number;
+    head_block_time: string;
+};
 import { initListValidator } from './namespaces/lists.js';
 
 const require = createRequire(import.meta.url);
@@ -263,7 +266,7 @@ export class WebServer {
 
         const running = true;
 
-        let info: GetInfoResult | undefined;
+        let info: ChainHealthInfo | undefined;
 
         (async (): Promise<void> => {
             while (running) {

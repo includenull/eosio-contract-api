@@ -1,7 +1,7 @@
 import { buildBoundaryFilter, RequestValues } from '../../utils.js';
 import { AtomicToolsContext } from '../index.js';
 import QueryBuilder from '../../../builder.js';
-import { Numeric } from 'eosjs';
+import { KeyType, PublicKey } from '@wharfkit/antelope';
 import { fillLinks } from '../filler.js';
 import { formatLink } from '../format.js';
 import { ApiError } from '../../../error.js';
@@ -40,10 +40,10 @@ export async function getLinksAction(params: RequestValues, ctx: AtomicToolsCont
     }
 
     if (args.public_key) {
-        const key = Numeric.stringToPublicKey(args.public_key);
+        const key = PublicKey.from(args.public_key);
 
-        query.equal('key_type', key.type.valueOf());
-        query.equal('key_data', key.data);
+        query.equal('key_type', KeyType.indexFor(key.type));
+        query.equal('key_data', key.data.array);
     }
 
     if (args.state) {

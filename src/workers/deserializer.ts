@@ -1,16 +1,16 @@
 import { workerData } from 'node:worker_threads';
-import { Serialize } from 'eosjs';
+import { ABI } from '@wharfkit/antelope';
 
 import logger from '../utils/logger.js';
 import { deserializeEosioType } from '../utils/eosio.js';
 
-type DeserializeRow = { type: string; data: Uint8Array | string | null; abi?: any };
+type DeserializeRow = { type: string; data: Uint8Array | string | null; abi?: unknown };
 
-const args = workerData as { abi: any };
+const args = workerData as { abi: unknown };
 
 logger.debug('Deserialization worker ready');
 
-const eosjsTypes: any = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), args.abi);
+const shipAbi = ABI.from(args.abi as Parameters<typeof ABI.from>[0]);
 
 export default function deserializeRows(param: DeserializeRow[]): any[] {
     const result: any[] = [];
@@ -21,11 +21,11 @@ export default function deserializeRows(param: DeserializeRow[]): any[] {
         }
 
         if (row.abi) {
-            const abiTypes = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), row.abi);
+            const rowAbi = ABI.from(row.abi as Parameters<typeof ABI.from>[0]);
 
-            result.push(deserializeEosioType(row.type, row.data, abiTypes));
+            result.push(deserializeEosioType(row.type, row.data, rowAbi));
         } else {
-            result.push(deserializeEosioType(row.type, row.data, eosjsTypes));
+            result.push(deserializeEosioType(row.type, row.data, shipAbi));
         }
     }
 

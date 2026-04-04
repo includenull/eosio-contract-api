@@ -2,8 +2,7 @@ import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import Piscina from 'piscina';
 import PQueue from 'p-queue';
-import { Serialize } from 'eosjs';
-import { Abi } from 'eosjs/dist/eosjs-rpc-interfaces.js';
+import { ABI } from '@wharfkit/antelope';
 import WebSocket from 'ws';
 
 import logger from '../utils/logger.js';
@@ -19,8 +18,7 @@ export default class StateHistoryBlockReader {
     currentArgs: BlockRequestType;
     deltaWhitelist: string[];
 
-    abi: Abi;
-    types: Map<string, Serialize.Type>;
+    shipAbi: ABI | null;
     tables: Map<string, string>;
 
     blocksQueue: PQueue;
@@ -49,8 +47,7 @@ export default class StateHistoryBlockReader {
 
         this.consumer = null;
 
-        this.abi = null;
-        this.types = null;
+        this.shipAbi = null;
         this.tables = new Map();
 
         this.deltaWhitelist = [];
@@ -95,7 +92,7 @@ export default class StateHistoryBlockReader {
     }
 
     send(request: [string, any]): void {
-        this.ws.send(serializeEosioType('request', request, this.types));
+        this.ws.send(serializeEosioType('request', request, this.shipAbi!));
     }
 
     setMinBlockConfirmation(minBlockConfirmation: number): void {
@@ -109,11 +106,10 @@ export default class StateHistoryBlockReader {
 
     onMessage(data: any): void {
         try {
-            if (!this.abi) {
+            if (!this.shipAbi) {
                 logger.info('Receiving ABI from ship...');
 
-                this.abi = JSON.parse(data);
-                this.types = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), this.abi);
+                this.shipAbi = ABI.from(JSON.parse(data));
 
                 if (this.options.ds_threads > 0) {
                     const requested = Math.floor(Number(this.options.ds_threads));
@@ -125,7 +121,7 @@ export default class StateHistoryBlockReader {
                         minThreads: poolSize,
                         maxThreads: poolSize,
                         idleTimeout: Infinity,
-                        workerData: {abi: this.abi}
+                        workerData: { abi: this.shipAbi.toJSON() }
                     });
 
                     if (poolSize !== requested) {
@@ -137,15 +133,15 @@ export default class StateHistoryBlockReader {
                     }
                 }
 
-                for (const table of this.abi.tables) {
-                    this.tables.set(table.name, table.type);
+                for (const table of this.shipAbi.tables) {
+                    this.tables.set(String(table.name), table.type);
                 }
 
                 if (!this.stopped) {
                     this.requestBlocks();
                 }
             } else {
-                const [type, response] = deserializeEosioType('result', data, this.types);
+                const [type, response] = deserializeEosioType('result', data, this.shipAbi);
 
                 if (['get_blocks_result_v0', 'get_blocks_result_v1', 'get_blocks_result_v2'].indexOf(type) >= 0) {
                     const config: {[key: string]: {version: number }} = {
@@ -308,8 +304,7 @@ export default class StateHistoryBlockReader {
             this.ws = null;
         }
 
-        this.abi = null;
-        this.types = null;
+        this.shipAbi = null;
         this.tables = new Map();
 
         this.connected = false;
@@ -346,7 +341,7 @@ export default class StateHistoryBlockReader {
         this.deltaWhitelist = deltas;
         this.stopped = false;
 
-        if (this.connected && this.abi) {
+        if (this.connected && this.shipAbi) {
             this.requestBlocks();
         }
 
@@ -404,7 +399,7 @@ export default class StateHistoryBlockReader {
             return batch[0];
         }
 
-        return deserializeEosioType(type, data, this.types);
+        return deserializeEosioType(type, data, this.shipAbi!);
     }
 
     private async deserializeArrayParallel(rows: Array<{type: string, data: Uint8Array}>): Promise<any> {
@@ -417,7 +412,7 @@ export default class StateHistoryBlockReader {
             return await pool.run(rows);
         }
 
-        return rows.map(row => deserializeEosioType(row.type, row.data, this.types));
+        return rows.map(row => deserializeEosioType(row.type, row.data, this.shipAbi!));
     }
 
     private async deserializeDeltas(deltas: any[]): Promise<any> {

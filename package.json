@@ -24,13 +24,13 @@
     "dev:init-test-db": "tsc && node --trace-warnings ./build/bin/init-test-db.js"
   },
   "dependencies": {
+    "@wharfkit/antelope": "^1.1.1",
     "async-exit-hook": "^2.0.1",
     "atomicassets": "^1.5.1",
     "await-lock": "^3.0.0",
     "common-tags": "^1.8.2",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
-    "eosjs": "^22.1.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
     "ioredis": "^5.10.1",

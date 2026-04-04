@@ -3,7 +3,7 @@ import DataProcessor from '../../../processor.js';
 import { ContractDBTransaction } from '../../../database.js';
 import { ShipBlock } from '../../../../types/ship.js';
 import { EosioActionTrace, EosioTransaction } from '../../../../types/eosio.js';
-import { Numeric } from 'eosjs';
+import { KeyType, PublicKey } from '@wharfkit/antelope';
 import { eosioTimestampToDate } from '../../../../utils/eosio.js';
 import { CancelLinkActionData, ClaimLinkActionData, LogLinkStartActionData, LogNewLinkActionData } from '../types/actions.js';
 
@@ -13,7 +13,7 @@ export function linkProcessor(core: AtomicToolsHandler, processor: DataProcessor
     destructors.push(processor.onActionTrace(
         core.args.atomictools_account, 'lognewlink',
         async (db: ContractDBTransaction, block: ShipBlock, tx: EosioTransaction, trace: EosioActionTrace<LogNewLinkActionData>): Promise<void> => {
-            const key = Numeric.stringToPublicKey(trace.act.data.key);
+            const key = PublicKey.from(trace.act.data.key);
 
             await db.insert('atomictools_links', {
                 tools_contract: core.args.atomictools_account,
@@ -22,8 +22,8 @@ export function linkProcessor(core: AtomicToolsHandler, processor: DataProcessor
                 creator: trace.act.data.creator,
                 claimer: null,
                 state: LinkState.WAITING.valueOf(),
-                key_type: key.type.valueOf(),
-                key_data: key.data,
+                key_type: KeyType.indexFor(key.type),
+                key_data: key.data.array,
                 memo: trace.act.data.memo.substr(0, 256),
                 created_at_block: block.block_num,
                 created_at_time: eosioTimestampToDate(block.timestamp).getTime(),
