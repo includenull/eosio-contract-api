@@ -47,6 +47,9 @@
     "swagger-ui-express": "^5.0.1",
     "ws": "^8.20.0"
   },
+  "optionalDependencies": {
+    "@eosrio/node-abieos": "^4.1.0-f7d5b45"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/common-tags": "^1.8.4",

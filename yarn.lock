@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@eosrio/node-abieos@^4.1.0-f7d5b45":
+  version "4.1.0-f7d5b45"
+  resolved "https://registry.yarnpkg.com/@eosrio/node-abieos/-/node-abieos-4.1.0-f7d5b45.tgz#074a6f6328d3729b9f0f50d82c3de24cf82b18b4"
+  integrity sha512-ccVBV/vw21EBnf1kdtJnI9TK8gLyjShBcnMbF57H9N6dxH5JOYMNnK1RWwXSOeeJifi6tvLm1wnz4oDzLspqXg==
+
 "@eslint-community/eslint-utils@^4.8.0", "@eslint-community/eslint-utils@^4.9.1":
   version "4.9.1"
   resolved "https://registry.yarnpkg.com/@eslint-community/eslint-utils/-/eslint-utils-4.9.1.tgz#4e90af67bc51ddee6cdef5284edf572ec376b595"

@@ -1,6 +1,7 @@
-import { ABI, APIClient, Bytes, Serializer } from '@wharfkit/antelope';
+import { ABI, APIClient, Serializer } from '@wharfkit/antelope';
 
 import type { UInt32 } from '@wharfkit/antelope';
+import { deserializeAbi } from '../utils/abi.js';
 
 function intToNumber(v: UInt32 | number): number {
     if (typeof v === 'number') {
@@ -92,7 +93,7 @@ export default class ChainApi {
     }
 
     deserializeAbi(data: Uint8Array): ABI {
-        return Serializer.decode({ data: Bytes.from(data), type: ABI });
+        return deserializeAbi(data);
     }
 
     async post(path: string, body: unknown): Promise<unknown> {
