@@ -11,6 +11,12 @@ async function getAssetIds(values: RequestValues): Promise<Array<number> | strin
     return await getRawAssetsAction(values, testContext);
 }
 
+async function getAssetCount(values: RequestValues): Promise<string> {
+    const testContext = getTestContext(client);
+
+    return await getRawAssetsAction({...values, count: 'true'}, testContext) as string;
+}
+
 describe('AtomicAssets Assets API', () => {
 
     describe('getRawAssetsAction V1', () => {
@@ -392,9 +398,44 @@ describe('AtomicAssets Assets API', () => {
 
             const {asset_id} = await client.createAsset();
 
-            const result = await getAssetIds({ids: `${asset_id}`, count: 'true'});
+            const result = await getAssetCount({ids: `${asset_id}`});
 
             expect(result).toBe('1');
+        });
+
+        txit('returns count from aggregate table without filters', async () => {
+            await client.createAsset({owner: null});
+            await client.createAsset();
+
+            expect(await getAssetCount({})).toBe('2');
+        });
+
+        txit('returns count from aggregate table for burned filter', async () => {
+            await client.createAsset({owner: null});
+            await client.createAsset();
+
+            expect(await getAssetCount({burned: 'true'})).toBe('1');
+            expect(await getAssetCount({burned: 'false'})).toBe('1');
+        });
+
+        txit('returns count from aggregate table for collection and template filters', async () => {
+            const {collection_name} = await client.createCollection({collection_name: 'x'});
+            const {template_id} = await client.createTemplate({collection_name});
+
+            await client.createAsset({collection_name, template_id});
+            await client.createAsset({collection_name});
+            await client.createAsset();
+
+            expect(await getAssetCount({collection_name})).toBe('2');
+            expect(await getAssetCount({template_id})).toBe('1');
+            expect(await getAssetCount({template_id: 'null'})).toBe('2');
+        });
+
+        txit('falls back to raw count for owner filter', async () => {
+            await client.createAsset({owner: 'alice'});
+            await client.createAsset({owner: 'bob'});
+
+            expect(await getAssetCount({owner: 'alice'})).toBe('1');
         });
 
         txit('orders ascending', async () => {
