@@ -2,11 +2,14 @@
 
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include <rapidjson/document.h>
+
+#include "ship_envelope.hpp"
 
 namespace ship_sidecar {
 
@@ -156,7 +159,52 @@ inline void appendMsgpackValue(std::vector<char>& out, const rapidjson::Value& v
     }
 }
 
-inline std::vector<char> jsonToMsgpack(const std::string& json) {
+inline void appendMsgpackBool(std::vector<char>& out, bool value) {
+    appendByte(out, value ? 0xc3 : 0xc2);
+}
+
+inline void appendMsgpackNull(std::vector<char>& out) {
+    appendByte(out, 0xc0);
+}
+
+inline void appendMsgpackKey(std::vector<char>& out, const char* key, size_t key_len) {
+    appendMsgpackString(out, key, key_len);
+}
+
+inline void appendMsgpackUint32(std::vector<char>& out, uint32_t value) {
+    if (value <= 127) {
+        appendByte(out, static_cast<uint8_t>(value));
+    } else if (value <= 65535) {
+        appendByte(out, 0xcd);
+        appendByte(out, static_cast<uint8_t>(value >> 8));
+        appendByte(out, static_cast<uint8_t>(value));
+    } else {
+        appendByte(out, 0xce);
+        appendUint32BE(out, value);
+    }
+}
+
+inline void appendBlockPositionMsgpack(std::vector<char>& out, const ship_sidecar::BlockPosition& position) {
+    appendMsgpackMapHeader(out, 2);
+    appendMsgpackKey(out, "block_num", 9);
+    appendMsgpackUint32(out, position.block_num);
+    appendMsgpackKey(out, "block_id", 8);
+    appendMsgpackString(out, position.block_id_hex.c_str(), position.block_id_hex.size());
+}
+
+inline void appendOptionalBlockPositionMsgpack(
+    std::vector<char>& out,
+    const std::optional<ship_sidecar::BlockPosition>& position
+) {
+    if (!position.has_value()) {
+        appendMsgpackNull(out);
+        return;
+    }
+
+    appendBlockPositionMsgpack(out, position.value());
+}
+
+inline std::vector<char> msgpackFromJsonString(const std::string& json) {
     rapidjson::Document doc;
     doc.Parse(json.c_str(), json.size());
     if (doc.HasParseError()) {
@@ -167,6 +215,10 @@ inline std::vector<char> jsonToMsgpack(const std::string& json) {
     out.reserve(json.size() / 2);
     appendMsgpackValue(out, doc);
     return out;
+}
+
+inline std::vector<char> jsonToMsgpack(const std::string& json) {
+    return msgpackFromJsonString(json);
 }
 
 } // namespace ship_sidecar

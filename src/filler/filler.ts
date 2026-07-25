@@ -33,6 +33,7 @@ export default class Filler {
 
     public readonly jobs: JobQueue;
     private running: boolean = false;
+    private progressInterval?: ReturnType<typeof setInterval>;
 
     private readonly handlers: ContractHandler[];
 
@@ -109,6 +110,21 @@ export default class Filler {
 
         logger.info('Starting reader: ' + this.config.name);
 
+        this.reader.onStopBlockComplete = async () => {
+            if (this.progressInterval) {
+                clearInterval(this.progressInterval);
+                this.progressInterval = undefined;
+            }
+
+            this.running = false;
+            this.jobs.stop();
+
+            await this.reader.stopProcessing();
+
+            logger.info('Reader ' + this.config.name + ' completed stop_block. Exiting.');
+            process.exit(0);
+        };
+
         await this.reader.startProcessing();
 
         const lastBlockSpeeds: number[] = [];
@@ -124,6 +140,10 @@ export default class Filler {
         const interval = setInterval(async () => {
             if (!this.running) {
                 clearInterval(interval);
+            }
+
+            if (this.reader.hasCompletedStopBlock()) {
+                return;
             }
 
             if (lastBlockNum === 0) {
@@ -148,6 +168,10 @@ export default class Filler {
             const queueState = `[DS:${this.reader.dsQueue.size}|SH:${this.reader.ship.blocksQueue.size}|JQ:${this.jobs.active}]`;
 
             if (lastBlockNum === this.reader.currentBlock && lastBlockNum > 0) {
+                if (this.reader.hasCompletedStopBlock()) {
+                    return;
+                }
+
                 const staleTime = Date.now() - lastBlockTime;
 
                 if (staleTime > timeout) {
@@ -198,6 +222,8 @@ export default class Filler {
             lastOperations = this.reader.database.stats.operations;
         }, logInterval * 1000);
 
+        this.progressInterval = interval;
+
         this.jobs.on('error', (error: Error, job: any) => {
             logger.error(`Error running job ${job.name}`, error);
         });
@@ -209,6 +235,11 @@ export default class Filler {
 
     async stopFiller(): Promise<void> {
         this.running = false;
+
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = undefined;
+        }
 
         this.jobs.stop();
 

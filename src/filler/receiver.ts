@@ -48,6 +48,9 @@ export default class StateReceiver {
     lastBlockUpdate = 0;
     lastDatabaseTransaction?: ContractDBTransaction;
     handlerDestructors: Array<() => void> = [];
+    stopBlockCompleted = false;
+
+    onStopBlockComplete?: () => void | Promise<void>;
 
     readonly name: string;
 
@@ -169,6 +172,49 @@ export default class StateReceiver {
         logger.info('Reader stopped at block #' + this.currentBlock);
     }
 
+    hasCompletedStopBlock(): boolean {
+        return this.stopBlockCompleted;
+    }
+
+    private hasReachedStopBlock(blockNum: number): boolean {
+        return this.config.stop_block > 0 && blockNum >= this.config.stop_block - 1;
+    }
+
+    private async flushPendingCommit(resp: ShipBlockResponse): Promise<void> {
+        if (!this.lastDatabaseTransaction || this.collectedBlocks <= 0) {
+            return;
+        }
+
+        const db = this.lastDatabaseTransaction;
+
+        await this.processor.executeHeadQueue(db);
+        await db.updateReaderPosition(resp.block, this.processor.getState() === ProcessingState.HEAD);
+        await db.commit();
+
+        this.collectedBlocks = 0;
+        this.lastDatabaseTransaction = null;
+        this.lastCommittedBlock = resp.this_block.block_num;
+        this.lastBlockUpdate = resp.this_block.block_num;
+
+        await this.processor.notifyCommit();
+        await this.notifier.publish();
+    }
+
+    private async completeStopBlockIfNeeded(resp: ShipBlockResponse): Promise<void> {
+        if (this.stopBlockCompleted || !this.hasReachedStopBlock(resp.this_block.block_num)) {
+            return;
+        }
+
+        await this.flushPendingCommit(resp);
+
+        this.stopBlockCompleted = true;
+
+        logger.info(
+            'Reader ' + this.config.name + ' reached stop_block ' + this.config.stop_block +
+            ' (last processed block #' + resp.this_block.block_num + ')'
+        );
+    }
+
     private async consumer(resp: ShipBlockResponse): Promise<void> {
         await this.dsLock.acquire();
         
@@ -178,6 +224,10 @@ export default class StateReceiver {
         this.dsQueue.add(async () => {
             try {
                 await this.process(resp, actionTraces, contractRows);
+
+                if (this.stopBlockCompleted && this.onStopBlockComplete) {
+                    await this.onStopBlockComplete();
+                }
             } catch (error) {
                 this.dsQueue.clear();
                 this.dsQueue.pause();
@@ -301,6 +351,8 @@ export default class StateReceiver {
                 throw e;
             }
         }
+
+        await this.completeStopBlockIfNeeded(resp);
     }
 
     private updateShipConfirmationMode(): void {

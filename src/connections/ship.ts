@@ -11,7 +11,6 @@ import {
     IBlockReaderOptions, ShipBlockResponse
 } from '../types/ship.js';
 import { deserializeEosioType, serializeEosioType } from '../utils/eosio.js';
-import { parseShipBlocksResult } from '../utils/ship-envelope.js';
 import { createShipSidecarPool, ShipSidecarPool } from './ship-sidecar-client.js';
 import { ShipSidecarFilterRules } from '../utils/ship-filter.js';
 
@@ -165,7 +164,8 @@ export default class StateHistoryBlockReader {
     private async initializeShipConnection(data: any): Promise<void> {
         logger.info('Receiving ABI from ship...');
 
-        this.shipAbi = ABI.from(JSON.parse(data));
+        const abiJson = typeof data === 'string' ? data : Buffer.from(data).toString('utf8');
+        this.shipAbi = ABI.from(JSON.parse(abiJson));
 
         if (this.options.ds_use_sidecar) {
             const requested = Math.floor(Number(this.options.ds_threads));
@@ -177,6 +177,7 @@ export default class StateHistoryBlockReader {
                 this.options.ds_sidecar_path
             );
 
+            await this.sidecarPool.setShipAbi(abiJson);
             await this.applySidecarFilters();
 
             if (poolSize !== requested) {
@@ -234,6 +235,11 @@ export default class StateHistoryBlockReader {
 
     private handleShipResultViaSidecar(data: Uint8Array | Buffer): void {
         void this.processShipResultViaSidecar(data).catch((error) => {
+            if (error instanceof Error && error.message.includes('unsupported ship blocks result type')) {
+                logger.warn('Not supported message received', { error: error.message });
+                return;
+            }
+
             logger.error('Failed to process ship result via sidecar', error);
             this.ws.close();
         });
@@ -276,24 +282,7 @@ export default class StateHistoryBlockReader {
             throw new Error('Sidecar filter rules are not configured');
         }
 
-        const parsed = parseShipBlocksResult(data, this.shipAbi!);
-        if (!parsed) {
-            const [type, response] = deserializeEosioType('result', data, this.shipAbi!);
-            logger.warn('Not supported message received', { type, response });
-            return;
-        }
-
-        const result = await this.sidecarPool.processShipMessage({
-            resultType: parsed.resultType,
-            version: parsed.version,
-            head: parsed.head,
-            last_irreversible: parsed.last_irreversible,
-            this_block: parsed.this_block,
-            prev_block: parsed.prev_block,
-            block: parsed.block,
-            traces: parsed.traces,
-            deltas: parsed.deltas,
-        });
+        const result = await this.sidecarPool.processShipMessage({ shipBytes: data });
 
         const payload: PendingSidecarBlocksResult = {
             type: result.result_type,
@@ -311,7 +300,7 @@ export default class StateHistoryBlockReader {
             },
         };
 
-        const blockNum = parsed.this_block?.block_num ?? result.this_block?.block_num;
+        const blockNum = result.this_block?.block_num;
         if (blockNum === undefined) {
             this.enqueueBlocksResult(payload.type, payload.response, payload.version, payload.preprocessed);
             return;

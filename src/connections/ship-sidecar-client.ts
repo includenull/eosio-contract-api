@@ -19,6 +19,7 @@ const OP_SET_ABI = 4;
 const OP_DESERIALIZE_CONTRACT_BATCH = 5;
 const OP_PROCESS_SHIP_MESSAGE = 6;
 const OP_SET_FILTERS = 7;
+const OP_SET_SHIP_ABI = 8;
 const OP_SHUTDOWN = 255;
 
 const FORMAT_TEXT = 0;
@@ -67,15 +68,7 @@ export type ShipSidecarFilters = {
 };
 
 export type ShipProcessMessageRequest = {
-    resultType: string;
-    version: number;
-    head: { block_num: number; block_id: string };
-    last_irreversible: { block_num: number; block_id: string };
-    this_block?: { block_num: number; block_id: string };
-    prev_block?: { block_num: number; block_id: string };
-    block?: Uint8Array;
-    traces?: Uint8Array;
-    deltas?: Uint8Array;
+    shipBytes: Uint8Array | Buffer;
 };
 
 export type ShipProcessMessageResponse = ShipBlockDeserializeResponse & {
@@ -134,23 +127,6 @@ function buildBinaryChunk(data: Buffer): Buffer {
     writeU32LE(out, 0, data.length);
     data.copy(out, 4);
     return out;
-}
-
-function buildBlockPositionChunk(position: { block_num: number; block_id: string }): Buffer {
-    const blockNum = Buffer.allocUnsafe(4);
-    writeU32LE(blockNum, 0, position.block_num);
-    return Buffer.concat([
-        blockNum,
-        buildBinaryChunk(Buffer.from(position.block_id, 'hex')),
-    ]);
-}
-
-function buildOptionalBlockPositionChunk(position?: { block_num: number; block_id: string }): Buffer {
-    if (!position) {
-        return Buffer.from([0]);
-    }
-
-    return Buffer.concat([Buffer.from([1]), buildBlockPositionChunk(position)]);
 }
 
 function appendStringList(chunks: Buffer[], values: string[]): void {
@@ -291,26 +267,18 @@ class ShipSidecarWorker {
     }
 
     async processShipMessage(request: ShipProcessMessageRequest): Promise<ShipProcessMessageResponse> {
-        const version = Buffer.allocUnsafe(4);
-        writeU32LE(version, 0, request.version);
-
-        const payload = Buffer.concat([
-            buildStringBytes(request.resultType),
-            version,
-            buildBlockPositionChunk(request.head),
-            buildBlockPositionChunk(request.last_irreversible),
-            buildOptionalBlockPositionChunk(request.this_block),
-            buildOptionalBlockPositionChunk(request.prev_block),
-            buildBinaryChunk(request.block ? normalizeBinary(request.block) : Buffer.alloc(0)),
-            buildBinaryChunk(request.traces ? normalizeBinary(request.traces) : Buffer.alloc(0)),
-            buildBinaryChunk(request.deltas ? normalizeBinary(request.deltas) : Buffer.alloc(0)),
-        ]);
-
-        return this.request(OP_PROCESS_SHIP_MESSAGE, payload) as Promise<ShipProcessMessageResponse>;
+        return this.request(
+            OP_PROCESS_SHIP_MESSAGE,
+            buildBinaryChunk(normalizeBinary(request.shipBytes))
+        ) as Promise<ShipProcessMessageResponse>;
     }
 
     async setFilters(filters: ShipSidecarFilters): Promise<void> {
         await this.request(OP_SET_FILTERS, buildFiltersPayload(filters));
+    }
+
+    async setShipAbi(abiJson: string): Promise<void> {
+        await this.request(OP_SET_SHIP_ABI, buildStringBytes(abiJson));
     }
 
     async setAbi(contract: string, abiJson: string): Promise<void> {
@@ -438,6 +406,7 @@ export class ShipSidecarPool {
     private nextWorker = 0;
     private readonly registeredAbis = new Map<string, string>();
     private registeredFiltersKey: string | null = null;
+    private registeredShipAbi: string | null = null;
 
     constructor(
         private readonly executablePath: string,
@@ -464,6 +433,7 @@ export class ShipSidecarPool {
         this.nextWorker = 0;
         this.registeredAbis.clear();
         this.registeredFiltersKey = null;
+        this.registeredShipAbi = null;
     }
 
     async deserialize(type: string, data: Uint8Array | string): Promise<unknown> {
@@ -490,6 +460,15 @@ export class ShipSidecarPool {
 
         await Promise.all(this.workers.map(worker => worker.setFilters(filters)));
         this.registeredFiltersKey = key;
+    }
+
+    async setShipAbi(abiJson: string): Promise<void> {
+        if (this.registeredShipAbi === abiJson) {
+            return;
+        }
+
+        await Promise.all(this.workers.map(worker => worker.setShipAbi(abiJson)));
+        this.registeredShipAbi = abiJson;
     }
 
     async registerAbi(contract: string, abiJson: string): Promise<void> {
