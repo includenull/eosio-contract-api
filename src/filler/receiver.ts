@@ -23,6 +23,7 @@ import ApiNotificationSender from './notifier.js';
 import Semaphore from '../utils/semaphore.js';
 import { ModuleLoader } from './modules.js';
 import ContractDeserializer, { ContractDeserializeRequest } from './contract-deserializer.js';
+import { buildShipSidecarFilterRules } from '../utils/ship-filter.js';
 
 type AbiCache = {
     contractAbi: ABI | null;
@@ -135,6 +136,12 @@ export default class StateReceiver {
         for (const handler of this.handlers) {
             this.handlerDestructors.push(await handler.register(this.processor, this.notifier));
         }
+
+        if (this.config.ds_use_sidecar) {
+            this.ship.setSidecarFilterRules(buildShipSidecarFilterRules(this.processor));
+        }
+
+        await this.preloadContractAbis(startBlock);
 
         this.currentBlock = startBlock - 1;
         this.lastBlockUpdate = startBlock - 1;
@@ -415,6 +422,10 @@ export default class StateReceiver {
 
     private async handleAbiUpdate(block: ShipBlock, action: EosioAction): Promise<void> {
         if (typeof action.data !== 'string') {
+            if (!this.processor.tracksContractAccount(action.data.account)) {
+                return;
+            }
+
             let contractAbi: ABI;
 
             try {
@@ -455,6 +466,10 @@ export default class StateReceiver {
 
     private async handleCodeUpdate(block: ShipBlock, action: EosioAction): Promise<void> {
         if (typeof action.data !== 'string') {
+            if (!this.processor.tracksContractAccount(action.data.account)) {
+                return;
+            }
+
             try {
                 await this.connection.database.query(
                     'INSERT into contract_codes (account, block_num, block_time) VALUES ($1, $2, $3)',
@@ -660,6 +675,20 @@ export default class StateReceiver {
         }
 
         return deltas;
+    }
+
+    private async preloadContractAbis(blockNum: number): Promise<void> {
+        const contracts = [...new Set([...this.processor.getContracts(true), 'eosio'])];
+
+        for (const contract of contracts) {
+            const cache = await this.fetchContractAbi(contract, blockNum);
+
+            if (cache.contractAbi && this.config.ds_use_sidecar) {
+                await this.contractDeserializer.registerAbi(contract, cache.contractAbi);
+            }
+        }
+
+        logger.info('Preloaded ABIs for ' + contracts.length + ' contracts');
     }
 
     private async fetchContractAbi(contract: string, blockNum: number): Promise<AbiCache> {

@@ -2,6 +2,7 @@
 
 #include "hex_utils.hpp"
 #include "json_msgpack.hpp"
+#include "ship_envelope.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -37,12 +38,24 @@ constexpr uint32_t kOpDeserializeBatch = 2;
 constexpr uint32_t kOpDeserializeBlock = 3;
 constexpr uint32_t kOpSetAbi = 4;
 constexpr uint32_t kOpDeserializeContractBatch = 5;
+constexpr uint32_t kOpProcessShipMessage = 6;
+constexpr uint32_t kOpSetFilters = 7;
 constexpr uint32_t kOpShutdown = 255;
 
 constexpr uint32_t kFormatText = 0;
 constexpr uint32_t kFormatMsgpack = 1;
 
 constexpr uint64_t kShipContract = 2;
+
+struct TraceFilter {
+    std::string contract;
+    std::string action;
+};
+
+struct TableFilter {
+    std::string code;
+    std::string table;
+};
 
 struct Job {
     uint32_t request_id = 0;
@@ -74,6 +87,9 @@ struct Worker {
 
     size_t index;
     abieos_context* context = nullptr;
+    std::unordered_set<std::string> delta_types;
+    std::vector<TraceFilter> trace_filters;
+    std::vector<TableFilter> table_filters;
 };
 
 std::vector<char> makeErrorResponse(const std::string& message) {
@@ -210,6 +226,89 @@ private:
         return true;
     }
 
+    static bool readU8(const char*& pos, const char* end, uint8_t& value) {
+        if (pos >= end) {
+            return false;
+        }
+        value = static_cast<uint8_t>(*pos++);
+        return true;
+    }
+
+    static bool readBlockPositionPayload(const char*& pos, const char* end, ship_sidecar::BlockPosition& out) {
+        uint32_t block_num = 0;
+        std::string block_id;
+        if (!readU32(pos, end, block_num) || !readBytes(pos, end, block_id)) {
+            return false;
+        }
+        if (block_id.size() != 32) {
+            throw std::runtime_error("invalid block_id length in process ship message payload");
+        }
+        out.block_num = block_num;
+        out.block_id_hex = ship_sidecar::bytesToHex(block_id.data(), block_id.size());
+        return true;
+    }
+
+    static bool readOptionalBlockPositionPayload(
+        const char*& pos,
+        const char* end,
+        std::optional<ship_sidecar::BlockPosition>& out
+    ) {
+        uint8_t present = 0;
+        if (!readU8(pos, end, present)) {
+            return false;
+        }
+        if (present == 0) {
+            out.reset();
+            return true;
+        }
+        ship_sidecar::BlockPosition value;
+        if (!readBlockPositionPayload(pos, end, value)) {
+            return false;
+        }
+        out = value;
+        return true;
+    }
+
+    static ship_sidecar::ParsedBlocksResult readParsedBlocksPayload(const char*& pos, const char* end) {
+        std::string result_type;
+        uint32_t version = 0;
+        ship_sidecar::ParsedBlocksResult parsed;
+
+        if (!readBytes(pos, end, result_type) || !readU32(pos, end, version) ||
+            !readBlockPositionPayload(pos, end, parsed.head) ||
+            !readBlockPositionPayload(pos, end, parsed.last_irreversible) ||
+            !readOptionalBlockPositionPayload(pos, end, parsed.this_block) ||
+            !readOptionalBlockPositionPayload(pos, end, parsed.prev_block)) {
+            throw std::runtime_error("invalid process ship message header");
+        }
+
+        parsed.result_type = result_type;
+        parsed.version = version;
+
+        if (!readOptionalBytes(pos, end, parsed.block, parsed.has_block) ||
+            !readOptionalBytes(pos, end, parsed.traces, parsed.has_traces) ||
+            !readOptionalBytes(pos, end, parsed.deltas, parsed.has_deltas)) {
+            throw std::runtime_error("invalid process ship message payload bytes");
+        }
+
+        return parsed;
+    }
+
+    static bool readOptionalBytes(
+        const char*& pos,
+        const char* end,
+        std::vector<char>& out,
+        bool& has_value
+    ) {
+        std::string bytes;
+        if (!readBytes(pos, end, bytes)) {
+            return false;
+        }
+        out.assign(bytes.begin(), bytes.end());
+        has_value = !out.empty();
+        return true;
+    }
+
     static bool readBytes(const char*& pos, const char* end, std::string& value) {
         uint32_t size = 0;
         if (!readU32(pos, end, size) || static_cast<size_t>(end - pos) < size) {
@@ -235,6 +334,182 @@ private:
         }
 
         return true;
+    }
+
+    static bool readTraceFilters(const char*& pos, const char* end, std::vector<TraceFilter>& filters) {
+        uint32_t count = 0;
+        if (!readU32(pos, end, count)) {
+            return false;
+        }
+
+        filters.reserve(count);
+        for (uint32_t i = 0; i < count; ++i) {
+            TraceFilter filter;
+            if (!readBytes(pos, end, filter.contract) || !readBytes(pos, end, filter.action)) {
+                return false;
+            }
+            filters.push_back(std::move(filter));
+        }
+
+        return true;
+    }
+
+    static bool readTableFilters(const char*& pos, const char* end, std::vector<TableFilter>& filters) {
+        uint32_t count = 0;
+        if (!readU32(pos, end, count)) {
+            return false;
+        }
+
+        filters.reserve(count);
+        for (uint32_t i = 0; i < count; ++i) {
+            TableFilter filter;
+            if (!readBytes(pos, end, filter.code) || !readBytes(pos, end, filter.table)) {
+                return false;
+            }
+            filters.push_back(std::move(filter));
+        }
+
+        return true;
+    }
+
+    static bool traceAllowed(
+        const std::string& contract,
+        const std::string& action,
+        const std::vector<TraceFilter>& filters
+    ) {
+        if (filters.empty()) {
+            return true;
+        }
+
+        for (const auto& filter : filters) {
+            if (filter.contract == contract && (filter.action == "*" || filter.action == action)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static const rapidjson::Value* getAbiVariantBody(const rapidjson::Value& value) {
+        if (value.IsObject()) {
+            return &value;
+        }
+
+        if (value.IsArray() && value.Size() >= 2 && value[1].IsObject()) {
+            return &value[1];
+        }
+
+        return nullptr;
+    }
+
+    static bool tableAllowed(
+        const std::string& code,
+        const std::string& table,
+        const std::vector<TableFilter>& filters
+    ) {
+        if (filters.empty()) {
+            return true;
+        }
+
+        for (const auto& filter : filters) {
+            if (filter.code == code && (filter.table == "*" || filter.table == table)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static void slimActionTraceObject(rapidjson::Value& trace_body, rapidjson::Document::AllocatorType& allocator) {
+        (void)allocator;
+        if (trace_body.IsObject()) {
+            trace_body.RemoveMember("console");
+            if (trace_body.HasMember("except") && trace_body["except"].IsNull()) {
+                trace_body.RemoveMember("except");
+            }
+            if (trace_body.HasMember("error_code") && trace_body["error_code"].IsNull()) {
+                trace_body.RemoveMember("error_code");
+            }
+        }
+    }
+
+    static std::string blockPositionJson(const ship_sidecar::BlockPosition& position) {
+        std::ostringstream json;
+        json << "{\"block_num\":" << position.block_num << ",\"block_id\":\"" << position.block_id_hex << "\"}";
+        return json.str();
+    }
+
+    std::string filterTracesJson(Worker& worker, const std::string& traces_json, const std::vector<TraceFilter>& filters) {
+        if (traces_json.empty()) {
+            return "[]";
+        }
+
+        rapidjson::Document doc;
+        doc.Parse(traces_json.c_str(), traces_json.size());
+        if (doc.HasParseError() || !doc.IsArray()) {
+            throw std::runtime_error("failed to parse transaction_trace[] json");
+        }
+
+        rapidjson::Document filtered;
+        filtered.SetArray();
+        auto& allocator = filtered.GetAllocator();
+
+        for (auto& transaction : doc.GetArray()) {
+            if (!transaction.IsArray() || transaction.Size() < 2 || !transaction[1].IsObject()) {
+                continue;
+            }
+
+            rapidjson::Value tx_copy(rapidjson::kArrayType);
+            tx_copy.PushBack(rapidjson::StringRef(transaction[0].GetString()), allocator);
+            rapidjson::Value tx_body;
+            tx_body.CopyFrom(transaction[1], allocator);
+
+            if (!tx_body.HasMember("action_traces") || !tx_body["action_traces"].IsArray()) {
+                continue;
+            }
+
+            rapidjson::Value kept_traces(rapidjson::kArrayType);
+            for (auto& action_trace : tx_body["action_traces"].GetArray()) {
+                if (!action_trace.IsArray() || action_trace.Size() < 2 || !action_trace[1].IsObject()) {
+                    continue;
+                }
+
+                rapidjson::Value& trace_body = action_trace[1];
+                if (!trace_body.HasMember("act") || !trace_body["act"].IsObject()) {
+                    continue;
+                }
+
+                const rapidjson::Value& act = trace_body["act"];
+                if (!act.HasMember("account") || !act.HasMember("name") ||
+                    !act["account"].IsString() || !act["name"].IsString()) {
+                    continue;
+                }
+
+                const std::string account = act["account"].GetString();
+                const std::string name = act["name"].GetString();
+                if (!traceAllowed(account, name, filters)) {
+                    continue;
+                }
+
+                slimActionTraceObject(trace_body, allocator);
+                rapidjson::Value trace_copy;
+                trace_copy.CopyFrom(action_trace, allocator);
+                kept_traces.PushBack(trace_copy, allocator);
+            }
+
+            if (kept_traces.Empty()) {
+                continue;
+            }
+
+            tx_body["action_traces"] = kept_traces;
+            tx_copy.PushBack(tx_body, allocator);
+            filtered.PushBack(tx_copy, allocator);
+        }
+
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        filtered.Accept(writer);
+        return buffer.GetString();
     }
 
     std::string deserializeType(Worker& worker, const std::string& type, const char* data, size_t size) {
@@ -272,14 +547,15 @@ private:
         }
     }
 
-    std::string deserializeDeltasWithWhitelist(
+    std::string deserializeDeltasWithFilters(
         Worker& worker,
         const char* data,
         size_t size,
-        const std::unordered_set<std::string>& whitelist
+        const std::unordered_set<std::string>& delta_types,
+        const std::vector<TableFilter>& table_filters
     ) {
         if (size == 0) {
-            return "null";
+            return "[]";
         }
 
         std::string deltas_json = deserializeType(worker, "table_delta[]", data, size);
@@ -290,20 +566,30 @@ private:
             throw std::runtime_error("failed to parse table_delta[] json");
         }
 
+        rapidjson::Document filtered;
+        filtered.SetArray();
+        auto& allocator = filtered.GetAllocator();
+
         for (auto& delta : doc.GetArray()) {
             if (!delta.IsArray() || delta.Size() < 2 || !delta[1].IsObject()) {
                 continue;
             }
 
-            rapidjson::Value& body = delta[1];
-            if (!body.HasMember("name") || !body["name"].IsString()) {
+            const rapidjson::Value& source_body = delta[1];
+            if (!source_body.HasMember("name") || !source_body["name"].IsString()) {
                 continue;
             }
 
-            const std::string name = body["name"].GetString();
-            if (whitelist.count(name) == 0 || !body.HasMember("rows") || !body["rows"].IsArray()) {
+            const std::string name = source_body["name"].GetString();
+            if (delta_types.count(name) == 0 || !source_body.HasMember("rows") || !source_body["rows"].IsArray()) {
                 continue;
             }
+
+            rapidjson::Value delta_copy(rapidjson::kArrayType);
+            delta_copy.PushBack(rapidjson::StringRef(delta[0].GetString()), allocator);
+            rapidjson::Value body;
+            body.CopyFrom(source_body, allocator);
+            rapidjson::Value kept_rows(rapidjson::kArrayType);
 
             for (auto& row : body["rows"].GetArray()) {
                 if (!row.IsObject() || !row.HasMember("data") || !row["data"].IsString()) {
@@ -315,18 +601,122 @@ private:
 
                 rapidjson::Document row_doc;
                 row_doc.Parse(row_json.c_str(), row_json.size());
-                if (row_doc.HasParseError()) {
+                const rapidjson::Value* row_body = getAbiVariantBody(row_doc);
+                if (row_doc.HasParseError() || !row_body) {
                     throw std::runtime_error("failed to parse delta row json for " + name);
                 }
 
-                row["data"].CopyFrom(row_doc, doc.GetAllocator());
+                if (name == "contract_row") {
+                    std::string code;
+                    std::string table;
+
+                    if (row_body->HasMember("code") && (*row_body)["code"].IsString()) {
+                        code = (*row_body)["code"].GetString();
+                    }
+                    if (row_body->HasMember("table") && (*row_body)["table"].IsString()) {
+                        table = (*row_body)["table"].GetString();
+                    }
+
+                    if (!tableAllowed(code, table, table_filters)) {
+                        continue;
+                    }
+                }
+
+                row["data"].CopyFrom(row_doc, allocator);
+                kept_rows.PushBack(row, allocator);
             }
+
+            if (kept_rows.Empty()) {
+                continue;
+            }
+
+            body["rows"] = kept_rows;
+            delta_copy.PushBack(body, allocator);
+            filtered.PushBack(delta_copy, allocator);
         }
 
         rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        doc.Accept(writer);
+        filtered.Accept(writer);
         return buffer.GetString();
+    }
+
+    std::string buildBlockJson(
+        Worker& worker,
+        uint32_t version,
+        const std::vector<char>& block_data,
+        bool has_block
+    ) {
+        if (!has_block || block_data.empty()) {
+            return "null";
+        }
+
+        if (version == 0) {
+            return deserializeType(worker, "signed_block", block_data.data(), block_data.size());
+        }
+
+        return deserializeType(worker, "signed_block_variant", block_data.data(), block_data.size());
+    }
+
+    std::string processParsedBlocksResult(
+        Worker& worker,
+        const ship_sidecar::ParsedBlocksResult& parsed,
+        const std::unordered_set<std::string>& delta_types,
+        const std::vector<TraceFilter>& trace_filters,
+        const std::vector<TableFilter>& table_filters
+    ) {
+        std::ostringstream json;
+        json << '{';
+        json << "\"result_type\":\"" << parsed.result_type << "\",";
+        json << "\"version\":" << parsed.version << ',';
+        json << "\"head\":" << blockPositionJson(parsed.head) << ',';
+        json << "\"last_irreversible\":" << blockPositionJson(parsed.last_irreversible) << ',';
+
+        json << "\"this_block\":";
+        if (parsed.this_block.has_value()) {
+            json << blockPositionJson(parsed.this_block.value());
+        } else {
+            json << "null";
+        }
+        json << ",\"prev_block\":";
+        if (parsed.prev_block.has_value()) {
+            json << blockPositionJson(parsed.prev_block.value());
+        } else {
+            json << "null";
+        }
+
+        json << ",\"block\":";
+        json << buildBlockJson(worker, parsed.version, parsed.block, parsed.has_block);
+
+        json << ",\"traces\":";
+        if (parsed.has_traces && !parsed.traces.empty()) {
+            const std::string traces_json = deserializeType(
+                worker, "transaction_trace[]", parsed.traces.data(), parsed.traces.size());
+            json << filterTracesJson(worker, traces_json, trace_filters);
+        } else {
+            json << "[]";
+        }
+
+        json << ",\"deltas\":";
+        if (parsed.has_deltas && !parsed.deltas.empty()) {
+            json << deserializeDeltasWithFilters(
+                worker, parsed.deltas.data(), parsed.deltas.size(), delta_types, table_filters);
+        } else {
+            json << "[]";
+        }
+
+        json << ",\"deltas_processed\":true";
+        json << '}';
+        return json.str();
+    }
+
+    std::string deserializeDeltasWithWhitelist(
+        Worker& worker,
+        const char* data,
+        size_t size,
+        const std::unordered_set<std::string>& whitelist
+    ) {
+        return deserializeDeltasWithFilters(worker, data, size, whitelist, {});
     }
 
     std::vector<char> handleJob(Worker& worker, const Job& job) {
@@ -397,15 +787,16 @@ private:
 
             json << ",\"traces\":";
             if (!traces_data.empty()) {
-                json << deserializeType(worker, "transaction_trace[]", traces_data.data(), traces_data.size());
+                const std::string traces_json = deserializeType(
+                    worker, "transaction_trace[]", traces_data.data(), traces_data.size());
+                json << filterTracesJson(worker, traces_json, {});
             } else {
                 json << "null";
             }
 
             json << ",\"deltas\":";
             if (!deltas_data.empty()) {
-                json << deserializeDeltasWithWhitelist(
-                    worker, deltas_data.data(), deltas_data.size(), whitelist);
+                json << deserializeDeltasWithFilters(worker, deltas_data.data(), deltas_data.size(), whitelist, {});
             } else {
                 json << "null";
             }
@@ -413,6 +804,30 @@ private:
             json << ",\"deltas_processed\":true";
             json << '}';
             return makeOkMsgpackFromJson(json.str());
+        }
+
+        if (job.op == kOpProcessShipMessage) {
+            const auto parsed = readParsedBlocksPayload(pos, end);
+
+            if (pos != end) {
+                throw std::runtime_error("invalid process ship message payload");
+            }
+
+            return makeOkMsgpackFromJson(processParsedBlocksResult(
+                worker, parsed, worker.delta_types, worker.trace_filters, worker.table_filters));
+        }
+
+        if (job.op == kOpSetFilters) {
+            worker.delta_types.clear();
+            worker.trace_filters.clear();
+            worker.table_filters.clear();
+
+            if (!readWhitelist(pos, end, worker.delta_types) || !readTraceFilters(pos, end, worker.trace_filters) ||
+                !readTableFilters(pos, end, worker.table_filters)) {
+                throw std::runtime_error("invalid set filters payload");
+            }
+
+            return makeOkMsgpackFromJson("{\"ok\":true}");
         }
 
         if (job.op == kOpSetAbi) {

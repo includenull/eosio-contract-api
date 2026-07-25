@@ -13,8 +13,21 @@ import {
 import { deserializeEosioType, serializeEosioType } from '../utils/eosio.js';
 import { parseShipBlocksResult } from '../utils/ship-envelope.js';
 import { createShipSidecarPool, ShipSidecarPool } from './ship-sidecar-client.js';
+import { ShipSidecarFilterRules } from '../utils/ship-filter.js';
 
 export type BlockConsumer = (block: ShipBlockResponse) => any;
+
+type PendingSidecarBlocksResult = {
+    type: string;
+    response: {
+        head: any;
+        last_irreversible: any;
+        this_block?: any;
+        prev_block?: any;
+    };
+    version: number;
+    preprocessed: { block: any; traces: any[]; deltas: any[] };
+};
 
 export default class StateHistoryBlockReader {
     currentArgs: BlockRequestType;
@@ -33,6 +46,9 @@ export default class StateHistoryBlockReader {
 
     private deserializeWorkers: Piscina | undefined;
     private sidecarPool: ShipSidecarPool | undefined;
+    private sidecarFilterRules: ShipSidecarFilterRules | undefined;
+    private nextSidecarBlockNum: number | null = null;
+    private pendingSidecarResults = new Map<number, PendingSidecarBlocksResult>();
 
     private unconfirmed: number;
     private consumer: BlockConsumer;
@@ -102,6 +118,27 @@ export default class StateHistoryBlockReader {
         this.options.min_block_confirmation = Math.max(1, minBlockConfirmation);
     }
 
+    setSidecarFilterRules(rules: ShipSidecarFilterRules): void {
+        this.sidecarFilterRules = rules;
+        logger.info(
+            'Ship sidecar filters: ' + rules.traceFilters.length + ' trace rules, ' +
+            rules.tableFilters.length + ' table rules'
+        );
+
+        void this.applySidecarFilters().catch((error) => {
+            logger.error('Failed to apply ship sidecar filters', error);
+            this.ws?.close();
+        });
+    }
+
+    private async applySidecarFilters(): Promise<void> {
+        if (!this.sidecarPool || !this.sidecarFilterRules) {
+            return;
+        }
+
+        await this.sidecarPool.setFilters(this.sidecarFilterRules);
+    }
+
     onConnect(): void {
         this.connected = true;
         this.connecting = false;
@@ -139,6 +176,8 @@ export default class StateHistoryBlockReader {
                 poolSize,
                 this.options.ds_sidecar_path
             );
+
+            await this.applySidecarFilters();
 
             if (poolSize !== requested) {
                 logger.warn(
@@ -194,15 +233,59 @@ export default class StateHistoryBlockReader {
     }
 
     private handleShipResultViaSidecar(data: Uint8Array | Buffer): void {
-        const parsed = parseShipBlocksResult(data, this.shipAbi!);
+        void this.processShipResultViaSidecar(data).catch((error) => {
+            logger.error('Failed to process ship result via sidecar', error);
+            this.ws.close();
+        });
+    }
 
+    private resetSidecarOrdering(startBlockNum: number): void {
+        this.nextSidecarBlockNum = startBlockNum;
+        this.pendingSidecarResults.clear();
+    }
+
+    private stageSidecarBlocksResult(blockNum: number, payload: PendingSidecarBlocksResult): void {
+        if (this.nextSidecarBlockNum === null) {
+            this.nextSidecarBlockNum = blockNum;
+        }
+
+        if (blockNum < this.nextSidecarBlockNum) {
+            this.pendingSidecarResults.clear();
+            this.nextSidecarBlockNum = blockNum;
+        }
+
+        this.pendingSidecarResults.set(blockNum, payload);
+        this.flushSidecarBlocksResults();
+    }
+
+    private flushSidecarBlocksResults(): void {
+        if (this.nextSidecarBlockNum === null) {
+            return;
+        }
+
+        while (this.pendingSidecarResults.has(this.nextSidecarBlockNum)) {
+            const payload = this.pendingSidecarResults.get(this.nextSidecarBlockNum)!;
+            this.pendingSidecarResults.delete(this.nextSidecarBlockNum);
+            this.enqueueBlocksResult(payload.type, payload.response, payload.version, payload.preprocessed);
+            this.nextSidecarBlockNum += 1;
+        }
+    }
+
+    private async processShipResultViaSidecar(data: Uint8Array | Buffer): Promise<void> {
+        if (!this.sidecarPool || !this.sidecarFilterRules) {
+            throw new Error('Sidecar filter rules are not configured');
+        }
+
+        const parsed = parseShipBlocksResult(data, this.shipAbi!);
         if (!parsed) {
             const [type, response] = deserializeEosioType('result', data, this.shipAbi!);
             logger.warn('Not supported message received', { type, response });
             return;
         }
 
-        const response = {
+        const result = await this.sidecarPool.processShipMessage({
+            resultType: parsed.resultType,
+            version: parsed.version,
             head: parsed.head,
             last_irreversible: parsed.last_irreversible,
             this_block: parsed.this_block,
@@ -210,12 +293,55 @@ export default class StateHistoryBlockReader {
             block: parsed.block,
             traces: parsed.traces,
             deltas: parsed.deltas,
+        });
+
+        const payload: PendingSidecarBlocksResult = {
+            type: result.result_type,
+            response: {
+                head: result.head,
+                last_irreversible: result.last_irreversible,
+                this_block: result.this_block ?? undefined,
+                prev_block: result.prev_block ?? undefined,
+            },
+            version: result.version,
+            preprocessed: {
+                block: this.extractBlockPayload(result.block, result.version),
+                traces: result.traces ?? [],
+                deltas: result.deltas ?? [],
+            },
         };
 
-        this.enqueueBlocksResult(parsed.resultType, response, parsed.version);
+        const blockNum = parsed.this_block?.block_num ?? result.this_block?.block_num;
+        if (blockNum === undefined) {
+            this.enqueueBlocksResult(payload.type, payload.response, payload.version, payload.preprocessed);
+            return;
+        }
+
+        this.stageSidecarBlocksResult(blockNum, payload);
     }
 
-    private enqueueBlocksResult(type: string, response: any, resultVersion?: number): void {
+    private extractBlockPayload(block: unknown, resultVersion: number): any {
+        if (!block) {
+            return null;
+        }
+
+        if (resultVersion === 0) {
+            return block;
+        }
+
+        if (Array.isArray(block) && block[0] === 'signed_block_v1') {
+            return block[1];
+        }
+
+        throw new Error('Unsupported block type received ' + String(Array.isArray(block) ? block[0] : typeof block));
+    }
+
+    private enqueueBlocksResult(
+        type: string,
+        response: any,
+        resultVersion?: number,
+        preprocessed?: { block: any; traces: any[]; deltas: any[] }
+    ): void {
         if (['get_blocks_result_v0', 'get_blocks_result_v1', 'get_blocks_result_v2'].indexOf(type) < 0) {
             logger.warn('Not supported message received', { type, response });
             return;
@@ -234,7 +360,11 @@ export default class StateHistoryBlockReader {
         let deltas: any = [];
 
         if (response.this_block) {
-            if (this.sidecarPool) {
+            if (preprocessed) {
+                block = Promise.resolve(preprocessed.block);
+                traces = Promise.resolve(preprocessed.traces);
+                deltas = Promise.resolve(preprocessed.deltas);
+            } else if (this.sidecarPool) {
                 const sidecarResult = this.deserializeBlockViaSidecar(type, version, response);
                 block = sidecarResult.then(result => result.block);
                 traces = sidecarResult.then(result => result.traces);
@@ -385,6 +515,8 @@ export default class StateHistoryBlockReader {
         this.connected = false;
         this.connecting = false;
 
+        this.nextSidecarBlockNum = null;
+        this.pendingSidecarResults.clear();
         this.blocksQueue.clear();
 
         if (this.deserializeWorkers) {
@@ -420,6 +552,7 @@ export default class StateHistoryBlockReader {
         };
         this.deltaWhitelist = deltas;
         this.stopped = false;
+        this.resetSidecarOrdering(this.currentArgs.start_block_num);
 
         if (this.connected && this.shipAbi) {
             this.requestBlocks();

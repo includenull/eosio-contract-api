@@ -44,4 +44,16 @@ inline std::vector<char> hexToBytes(const std::string& hex) {
     return out;
 }
 
+inline std::string bytesToHex(const char* data, size_t size) {
+    static const char* digits = "0123456789abcdef";
+    std::string out;
+    out.reserve(size * 2);
+    for (size_t i = 0; i < size; ++i) {
+        const unsigned char byte = static_cast<unsigned char>(data[i]);
+        out.push_back(digits[byte >> 4]);
+        out.push_back(digits[byte & 0x0f]);
+    }
+    return out;
+}
+
 } // namespace ship_sidecar

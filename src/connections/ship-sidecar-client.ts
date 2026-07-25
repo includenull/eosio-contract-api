@@ -17,6 +17,8 @@ const OP_DESERIALIZE_BATCH = 2;
 const OP_DESERIALIZE_BLOCK = 3;
 const OP_SET_ABI = 4;
 const OP_DESERIALIZE_CONTRACT_BATCH = 5;
+const OP_PROCESS_SHIP_MESSAGE = 6;
+const OP_SET_FILTERS = 7;
 const OP_SHUTDOWN = 255;
 
 const FORMAT_TEXT = 0;
@@ -46,6 +48,43 @@ export type ShipBlockDeserializeResponse = {
     traces: unknown[] | null;
     deltas: unknown[] | null;
     deltas_processed?: boolean;
+};
+
+export type ShipTraceFilter = {
+    contract: string;
+    action: string;
+};
+
+export type ShipTableFilter = {
+    code: string;
+    table: string;
+};
+
+export type ShipSidecarFilters = {
+    deltaTypes: string[];
+    traceFilters: ShipTraceFilter[];
+    tableFilters: ShipTableFilter[];
+};
+
+export type ShipProcessMessageRequest = {
+    resultType: string;
+    version: number;
+    head: { block_num: number; block_id: string };
+    last_irreversible: { block_num: number; block_id: string };
+    this_block?: { block_num: number; block_id: string };
+    prev_block?: { block_num: number; block_id: string };
+    block?: Uint8Array;
+    traces?: Uint8Array;
+    deltas?: Uint8Array;
+};
+
+export type ShipProcessMessageResponse = ShipBlockDeserializeResponse & {
+    result_type: string;
+    version: number;
+    head: { block_num: number; block_id: string };
+    last_irreversible: { block_num: number; block_id: string };
+    this_block?: { block_num: number; block_id: string } | null;
+    prev_block?: { block_num: number; block_id: string } | null;
 };
 
 export function resolveDefaultSidecarPath(): string {
@@ -95,6 +134,63 @@ function buildBinaryChunk(data: Buffer): Buffer {
     writeU32LE(out, 0, data.length);
     data.copy(out, 4);
     return out;
+}
+
+function buildBlockPositionChunk(position: { block_num: number; block_id: string }): Buffer {
+    const blockNum = Buffer.allocUnsafe(4);
+    writeU32LE(blockNum, 0, position.block_num);
+    return Buffer.concat([
+        blockNum,
+        buildBinaryChunk(Buffer.from(position.block_id, 'hex')),
+    ]);
+}
+
+function buildOptionalBlockPositionChunk(position?: { block_num: number; block_id: string }): Buffer {
+    if (!position) {
+        return Buffer.from([0]);
+    }
+
+    return Buffer.concat([Buffer.from([1]), buildBlockPositionChunk(position)]);
+}
+
+function appendStringList(chunks: Buffer[], values: string[]): void {
+    const header = Buffer.allocUnsafe(4);
+    writeU32LE(header, 0, values.length);
+    chunks.push(header);
+
+    for (const value of values) {
+        chunks.push(buildStringBytes(value));
+    }
+}
+
+function appendTraceFilters(chunks: Buffer[], filters: ShipTraceFilter[]): void {
+    const header = Buffer.allocUnsafe(4);
+    writeU32LE(header, 0, filters.length);
+    chunks.push(header);
+
+    for (const filter of filters) {
+        chunks.push(buildStringBytes(filter.contract));
+        chunks.push(buildStringBytes(filter.action));
+    }
+}
+
+function appendTableFilters(chunks: Buffer[], filters: ShipTableFilter[]): void {
+    const header = Buffer.allocUnsafe(4);
+    writeU32LE(header, 0, filters.length);
+    chunks.push(header);
+
+    for (const filter of filters) {
+        chunks.push(buildStringBytes(filter.code));
+        chunks.push(buildStringBytes(filter.table));
+    }
+}
+
+function buildFiltersPayload(filters: ShipSidecarFilters): Buffer {
+    const chunks: Buffer[] = [];
+    appendStringList(chunks, filters.deltaTypes);
+    appendTraceFilters(chunks, filters.traceFilters);
+    appendTableFilters(chunks, filters.tableFilters);
+    return Buffer.concat(chunks);
 }
 
 function readU32(buffer: Buffer, offset: number): number {
@@ -192,6 +288,29 @@ class ShipSidecarWorker {
         }
 
         return this.request(OP_DESERIALIZE_BLOCK, Buffer.concat(chunks)) as Promise<ShipBlockDeserializeResponse>;
+    }
+
+    async processShipMessage(request: ShipProcessMessageRequest): Promise<ShipProcessMessageResponse> {
+        const version = Buffer.allocUnsafe(4);
+        writeU32LE(version, 0, request.version);
+
+        const payload = Buffer.concat([
+            buildStringBytes(request.resultType),
+            version,
+            buildBlockPositionChunk(request.head),
+            buildBlockPositionChunk(request.last_irreversible),
+            buildOptionalBlockPositionChunk(request.this_block),
+            buildOptionalBlockPositionChunk(request.prev_block),
+            buildBinaryChunk(request.block ? normalizeBinary(request.block) : Buffer.alloc(0)),
+            buildBinaryChunk(request.traces ? normalizeBinary(request.traces) : Buffer.alloc(0)),
+            buildBinaryChunk(request.deltas ? normalizeBinary(request.deltas) : Buffer.alloc(0)),
+        ]);
+
+        return this.request(OP_PROCESS_SHIP_MESSAGE, payload) as Promise<ShipProcessMessageResponse>;
+    }
+
+    async setFilters(filters: ShipSidecarFilters): Promise<void> {
+        await this.request(OP_SET_FILTERS, buildFiltersPayload(filters));
     }
 
     async setAbi(contract: string, abiJson: string): Promise<void> {
@@ -318,6 +437,7 @@ export class ShipSidecarPool {
     private workers: ShipSidecarWorker[] = [];
     private nextWorker = 0;
     private readonly registeredAbis = new Map<string, string>();
+    private registeredFiltersKey: string | null = null;
 
     constructor(
         private readonly executablePath: string,
@@ -343,6 +463,7 @@ export class ShipSidecarPool {
         this.workers = [];
         this.nextWorker = 0;
         this.registeredAbis.clear();
+        this.registeredFiltersKey = null;
     }
 
     async deserialize(type: string, data: Uint8Array | string): Promise<unknown> {
@@ -355,6 +476,20 @@ export class ShipSidecarPool {
 
     async deserializeBlock(request: ShipBlockDeserializeRequest): Promise<ShipBlockDeserializeResponse> {
         return this.pickWorker().deserializeBlock(request);
+    }
+
+    async processShipMessage(request: ShipProcessMessageRequest): Promise<ShipProcessMessageResponse> {
+        return this.pickWorker().processShipMessage(request);
+    }
+
+    async setFilters(filters: ShipSidecarFilters): Promise<void> {
+        const key = JSON.stringify(filters);
+        if (this.registeredFiltersKey === key) {
+            return;
+        }
+
+        await Promise.all(this.workers.map(worker => worker.setFilters(filters)));
+        this.registeredFiltersKey = key;
     }
 
     async registerAbi(contract: string, abiJson: string): Promise<void> {
