@@ -11,11 +11,11 @@ WORKDIR /home/application/app
 COPY yarn.lock .
 COPY package.json .
 
-RUN yarn install --ignore-scripts
+RUN yarn install --frozen-lockfile --ignore-scripts
 
 COPY . .
 
-RUN yarn install
+RUN yarn install --frozen-lockfile
 
 ENV NODE_ENV production
 EXPOSE 9000
