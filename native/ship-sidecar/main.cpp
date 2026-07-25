@@ -9,6 +9,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -210,6 +211,44 @@ namespace
                 return false;
             }
 
+            response = std::move(it->second);
+            responses_.erase(it);
+            return true;
+        }
+
+        bool hasResponses()
+        {
+            std::lock_guard<std::mutex> lock(response_mutex_);
+            return !responses_.empty();
+        }
+
+        bool waitAnyResponse(uint32_t &request_id, std::vector<char> &response, int timeout_ms = 120000)
+        {
+            std::unique_lock<std::mutex> lock(response_mutex_);
+            const auto ready = [this]()
+            {
+                return !responses_.empty() || stop_.load();
+            };
+
+            if (timeout_ms > 0)
+            {
+                if (!response_cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms), ready))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                response_cv_.wait(lock, ready);
+            }
+
+            if (responses_.empty())
+            {
+                return false;
+            }
+
+            auto it = responses_.begin();
+            request_id = it->first;
             response = std::move(it->second);
             responses_.erase(it);
             return true;
@@ -955,14 +994,13 @@ namespace
 
             if (job.op == kOpProcessShipMessage)
             {
-                std::string ship_bytes;
-                if (!readBytes(pos, end, ship_bytes) || pos != end)
+                if (job.payload.empty())
                 {
                     throw std::runtime_error("invalid process ship message payload");
                 }
 
                 const auto parsed = ship_sidecar::parseShipResultAbieos(
-                    worker.context, ship_bytes.data(), ship_bytes.size());
+                    worker.context, job.payload.data(), job.payload.size());
 
                 std::vector<ship_sidecar::TraceFilterRule> trace_rules;
                 trace_rules.reserve(worker.trace_filters.size());
@@ -1116,13 +1154,21 @@ namespace
 
     bool writeMessage(std::ostream &out, uint32_t request_id, const std::vector<char> &body)
     {
-        uint32_t header[5] = {kMagic, kVersion, request_id, 0, static_cast<uint32_t>(body.size())};
-        if (!writeExact(out, reinterpret_cast<const char *>(header), sizeof(header)))
+        std::vector<char> frame(20 + body.size());
+        const uint32_t header[5] = {
+            kMagic,
+            kVersion,
+            request_id,
+            0,
+            static_cast<uint32_t>(body.size()),
+        };
+        std::memcpy(frame.data(), header, sizeof(header));
+        if (!body.empty())
         {
-            return false;
+            std::memcpy(frame.data() + 20, body.data(), body.size());
         }
 
-        if (!body.empty() && !writeExact(out, body.data(), body.size()))
+        if (!writeExact(out, frame.data(), frame.size()))
         {
             return false;
         }
@@ -1131,42 +1177,76 @@ namespace
         return out.good();
     }
 
+    void configureStdioBuffers()
+    {
+        static char stdin_buffer[1 << 20];
+        setvbuf(stdin, stdin_buffer, _IOFBF, sizeof(stdin_buffer));
+    }
+
     void runStdio(Sidecar &sidecar)
     {
         std::ios_base::sync_with_stdio(false);
         std::cin.tie(nullptr);
+        configureStdioBuffers();
+
+        std::atomic<bool> reader_done{false};
+        std::mutex cout_mutex;
+
+        std::thread reader([&]()
+                           {
+                               try
+                               {
+                                   while (true)
+                                   {
+                                       uint32_t request_id = 0;
+                                       uint32_t op = 0;
+                                       std::vector<char> payload;
+
+                                       if (!readMessage(std::cin, request_id, op, payload))
+                                       {
+                                           break;
+                                       }
+
+                                       sidecar.enqueue(Job{request_id, op, std::move(payload)});
+
+                                       if (op == kOpShutdown)
+                                       {
+                                           break;
+                                       }
+                                   }
+                               }
+                               catch (const std::exception &error)
+                               {
+                                   std::cerr << "ship-sidecar reader error: " << error.what() << std::endl;
+                               }
+
+                               reader_done.store(true);
+                               sidecar.stop();
+                           });
 
         while (true)
         {
             uint32_t request_id = 0;
-            uint32_t op = 0;
-            std::vector<char> payload;
-
-            if (!readMessage(std::cin, request_id, op, payload))
-            {
-                break;
-            }
-
-            if (op == kOpShutdown)
-            {
-                writeMessage(std::cout, request_id, makeOkMsgpackFromJson("{\"shutdown\":true}"));
-                break;
-            }
-
-            Job job{request_id, op, std::move(payload)};
-            sidecar.enqueue(std::move(job));
-
             std::vector<char> response;
-            if (!sidecar.waitResponse(request_id, response))
+            if (!sidecar.waitAnyResponse(request_id, response, 50))
             {
-                std::cerr << "ship-sidecar: response timeout for request " << request_id << std::endl;
-                break;
+                if (reader_done.load() && !sidecar.hasResponses())
+                {
+                    break;
+                }
+                continue;
             }
 
+            std::lock_guard<std::mutex> lock(cout_mutex);
             if (!writeMessage(std::cout, request_id, response))
             {
                 break;
             }
+        }
+
+        if (reader.joinable())
+        {
+            reader.join();
         }
     }
 

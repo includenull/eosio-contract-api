@@ -169,17 +169,130 @@ function buildFiltersPayload(filters: ShipSidecarFilters): Buffer {
     return Buffer.concat(chunks);
 }
 
-function readU32(buffer: Buffer, offset: number): number {
-    return buffer.readUInt32LE(offset);
+function buildFrame(requestId: number, op: number, payload: Buffer): Buffer {
+    const frame = Buffer.allocUnsafe(20 + payload.length);
+    writeU32LE(frame, 0, MAGIC);
+    writeU32LE(frame, 4, VERSION);
+    writeU32LE(frame, 8, requestId);
+    writeU32LE(frame, 12, op);
+    writeU32LE(frame, 16, payload.length);
+    if (payload.length > 0) {
+        payload.copy(frame, 20);
+    }
+    return frame;
+}
+
+class InboundAccumulator {
+    private chunks: Buffer[] = [];
+    private chunkIndex = 0;
+    private byteOffset = 0;
+    private totalLength = 0;
+
+    append(chunk: Buffer): void {
+        if (chunk.length === 0) {
+            return;
+        }
+
+        this.chunks.push(chunk);
+        this.totalLength += chunk.length;
+    }
+
+    available(): number {
+        return this.totalLength;
+    }
+
+    peekU32(byteOffset: number): number | null {
+        const bytes = this.peekSlice(byteOffset, 4);
+        if (!bytes) {
+            return null;
+        }
+
+        return bytes.readUInt32LE(0);
+    }
+
+    peekSlice(byteOffset: number, size: number): Buffer | null {
+        if (byteOffset + size > this.totalLength) {
+            return null;
+        }
+
+        let remainingSkip = byteOffset;
+        let chunkIndex = this.chunkIndex;
+        let offset = this.byteOffset;
+
+        while (chunkIndex < this.chunks.length && remainingSkip > 0) {
+            const chunk = this.chunks[chunkIndex];
+            const available = chunk.length - offset;
+            if (remainingSkip >= available) {
+                remainingSkip -= available;
+                chunkIndex += 1;
+                offset = 0;
+            } else {
+                offset += remainingSkip;
+                remainingSkip = 0;
+            }
+        }
+
+        if (chunkIndex >= this.chunks.length) {
+            return null;
+        }
+
+        const first = this.chunks[chunkIndex];
+        const firstLen = Math.min(size, first.length - offset);
+        if (firstLen === size) {
+            return first.subarray(offset, offset + size);
+        }
+
+        const out = Buffer.allocUnsafe(size);
+        let written = 0;
+        let currentIndex = chunkIndex;
+        let currentOffset = offset;
+
+        while (written < size && currentIndex < this.chunks.length) {
+            const chunk = this.chunks[currentIndex];
+            const copyLen = Math.min(size - written, chunk.length - currentOffset);
+            chunk.copy(out, written, currentOffset, currentOffset + copyLen);
+            written += copyLen;
+            currentIndex += 1;
+            currentOffset = 0;
+        }
+
+        return out;
+    }
+
+    consume(size: number): void {
+        if (size <= 0) {
+            return;
+        }
+
+        this.totalLength -= size;
+
+        while (size > 0 && this.chunkIndex < this.chunks.length) {
+            const chunk = this.chunks[this.chunkIndex];
+            const available = chunk.length - this.byteOffset;
+            if (size >= available) {
+                size -= available;
+                this.chunkIndex += 1;
+                this.byteOffset = 0;
+            } else {
+                this.byteOffset += size;
+                size = 0;
+            }
+        }
+
+        if (this.chunkIndex > 0) {
+            this.chunks = this.chunks.slice(this.chunkIndex);
+            this.chunkIndex = 0;
+        }
+    }
 }
 
 class ShipSidecarWorker {
     private process: ChildProcessWithoutNullStreams | null = null;
     private readonly pending = new Map<number, PendingRequest>();
-    private inboundBuffer = Buffer.alloc(0);
+    private readonly inbound = new InboundAccumulator();
     private nextRequestId = 1;
     private closed = false;
-    private requestChain: Promise<void> = Promise.resolve();
+    private writeQueue: Promise<void> = Promise.resolve();
 
     constructor(
         private readonly executablePath: string,
@@ -200,7 +313,7 @@ class ShipSidecarWorker {
         });
 
         this.process.stdout.on('data', (chunk: Buffer) => {
-            this.inboundBuffer = Buffer.concat([this.inboundBuffer, chunk]);
+            this.inbound.append(chunk);
             this.drainInbound();
         });
 
@@ -269,7 +382,7 @@ class ShipSidecarWorker {
     async processShipMessage(request: ShipProcessMessageRequest): Promise<ShipProcessMessageResponse> {
         return this.request(
             OP_PROCESS_SHIP_MESSAGE,
-            buildBinaryChunk(normalizeBinary(request.shipBytes))
+            normalizeBinary(request.shipBytes)
         ) as Promise<ShipProcessMessageResponse>;
     }
 
@@ -314,48 +427,65 @@ class ShipSidecarWorker {
             return Promise.reject(new Error(`ship-sidecar worker #${this.workerId} is not running`));
         }
 
-        const execute = async (): Promise<unknown> => {
-            const requestId = this.nextRequestId++;
+        const requestId = this.nextRequestId++;
+        const pendingPromise = new Promise<unknown>((resolve, reject) => {
+            this.pending.set(requestId, { resolve, reject });
+        });
 
-            return new Promise((resolve, reject) => {
-                this.pending.set(requestId, { resolve, reject });
-
-                const header = Buffer.allocUnsafe(20);
-                writeU32LE(header, 0, MAGIC);
-                writeU32LE(header, 4, VERSION);
-                writeU32LE(header, 8, requestId);
-                writeU32LE(header, 12, op);
-                writeU32LE(header, 16, payload.length);
-
-                this.process!.stdin.write(Buffer.concat([header, payload]));
+        const frame = buildFrame(requestId, op, payload);
+        const writePromise = this.writeQueue
+            .then(() => this.writeFrame(frame))
+            .catch((error) => {
+                const pending = this.pending.get(requestId);
+                if (pending) {
+                    this.pending.delete(requestId);
+                    pending.reject(error instanceof Error ? error : new Error(String(error)));
+                }
             });
-        };
 
-        const result = this.requestChain.then(execute, execute);
-        this.requestChain = result.then((): void => undefined, (): void => undefined);
-        return result;
+        this.writeQueue = writePromise.then((): void => undefined, (): void => undefined);
+        return pendingPromise;
+    }
+
+    private writeFrame(frame: Buffer): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const stdin = this.process!.stdin;
+            const ok = stdin.write(frame, (error) => {
+                if (error) {
+                    reject(error);
+                }
+            });
+
+            if (ok) {
+                resolve();
+                return;
+            }
+
+            stdin.once('drain', resolve);
+            stdin.once('error', reject);
+        });
     }
 
     private drainInbound(): void {
-        while (this.inboundBuffer.length >= 20) {
-            const magic = readU32(this.inboundBuffer, 0);
-            const version = readU32(this.inboundBuffer, 4);
+        while (this.inbound.available() >= 20) {
+            const magic = this.inbound.peekU32(0);
+            const version = this.inbound.peekU32(4);
 
             if (magic !== MAGIC || version !== VERSION) {
                 this.failAll(new Error(`invalid ship-sidecar response header on worker #${this.workerId}`));
                 return;
             }
 
-            const requestId = readU32(this.inboundBuffer, 8);
-            const bodyLength = readU32(this.inboundBuffer, 16);
+            const requestId = this.inbound.peekU32(8)!;
+            const bodyLength = this.inbound.peekU32(16)!;
             const totalLength = 20 + bodyLength;
 
-            if (this.inboundBuffer.length < totalLength) {
+            if (this.inbound.available() < totalLength) {
                 return;
             }
 
-            const body = this.inboundBuffer.subarray(20, totalLength);
-            this.inboundBuffer = this.inboundBuffer.subarray(totalLength);
+            const body = this.inbound.peekSlice(20, bodyLength)!;
+            this.inbound.consume(totalLength);
 
             const pending = this.pending.get(requestId);
             if (!pending) {
@@ -369,9 +499,9 @@ class ShipSidecarWorker {
                 continue;
             }
 
-            const status = readU32(body, 0);
-            const format = readU32(body, 4);
-            const payloadLength = readU32(body, 8);
+            const status = body.readUInt32LE(0);
+            const format = body.readUInt32LE(4);
+            const payloadLength = body.readUInt32LE(8);
             const payload = body.subarray(12, 12 + payloadLength);
 
             if (status !== 0) {
