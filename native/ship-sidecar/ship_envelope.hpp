@@ -162,11 +162,11 @@ inline ParsedBlocksResult parseShipResult(const char* data, size_t size) {
     BinReader reader(data, size);
 
     uint32_t variant_index = 0;
-    if (!reader.readU32(variant_index)) {
+    if (!reader.readVaruint32(variant_index)) {
         throw std::runtime_error("ship result too short for variant index");
     }
 
-    if (variant_index == 0 || variant_index == 3) {
+    if (variant_index == 0) {
         throw std::runtime_error("ship result is not a get_blocks_result variant");
     }
 

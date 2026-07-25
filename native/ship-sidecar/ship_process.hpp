@@ -395,14 +395,20 @@ inline std::vector<char> processParsedBlocksResultMsgpack(
         block_msgpack.clear();
         appendMsgpackNull(block_msgpack);
     } else {
-        block_msgpack = extractSlimBlockMsgpack(
-            context, parsed.version, parsed.block.data(), parsed.block.size());
+        block_msgpack = extractSlimBlockMsgpack(parsed.version, parsed.block.data(), parsed.block.size());
     }
 
     std::vector<char> traces_msgpack;
     if (parsed.has_traces && !parsed.traces.empty()) {
-        traces_msgpack = filterTracesBinaryMsgpack(
-            context, parsed.traces.data(), parsed.traces.size(), trace_filters);
+        try {
+            traces_msgpack = filterTracesBinaryMsgpack(
+                context, parsed.traces.data(), parsed.traces.size(), trace_filters);
+        } catch (const std::exception&) {
+            const rapidjson::Document filtered = filterTracesDocument(
+                context, parsed.traces.data(), parsed.traces.size(), trace_filters);
+            traces_msgpack.clear();
+            appendMsgpackArray(traces_msgpack, filtered);
+        }
     } else {
         traces_msgpack.clear();
         appendMsgpackArrayHeader(traces_msgpack, 0);
@@ -411,7 +417,7 @@ inline std::vector<char> processParsedBlocksResultMsgpack(
     std::vector<char> deltas_msgpack;
     if (parsed.has_deltas && !parsed.deltas.empty()) {
         deltas_msgpack = filterDeltasBinaryMsgpack(
-            context, parsed.deltas.data(), parsed.deltas.size(), delta_types, table_filters);
+            parsed.deltas.data(), parsed.deltas.size(), delta_types, table_filters);
     } else {
         deltas_msgpack.clear();
         appendMsgpackArrayHeader(deltas_msgpack, 0);

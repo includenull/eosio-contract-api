@@ -61,6 +61,8 @@ if (cluster.isPrimary || cluster.isMaster) {
             error => logger.error('Failed setting autovacuum settings', error)
         );
 
+        let remainingWorkers = readerConfigs.length;
+
         for (let i = 0; i < readerConfigs.length; i++) {
             // @ts-ignore
             const worker = cluster.fork({config_index: i});
@@ -68,6 +70,16 @@ if (cluster.isPrimary || cluster.isMaster) {
             worker.on('message', (data: any) => {
                 if (data.msg === 'failure') {
                     process.exit(-1);
+                }
+            });
+
+            worker.on('exit', (code, signal) => {
+                remainingWorkers -= 1;
+                logger.info(`Worker ${worker.id} exited (code=${code}, signal=${signal ?? 'none'})`);
+
+                if (remainingWorkers === 0) {
+                    logger.info('All workers finished. Shutting down filler.');
+                    process.exit(code ?? 0);
                 }
             });
         }

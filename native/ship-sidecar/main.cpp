@@ -999,8 +999,8 @@ namespace
                     throw std::runtime_error("invalid process ship message payload");
                 }
 
-                const auto parsed = ship_sidecar::parseShipResultAbieos(
-                    worker.context, job.payload.data(), job.payload.size());
+                const auto parsed = ship_sidecar::parseShipResult(
+                    job.payload.data(), job.payload.size());
 
                 std::vector<ship_sidecar::TraceFilterRule> trace_rules;
                 trace_rules.reserve(worker.trace_filters.size());

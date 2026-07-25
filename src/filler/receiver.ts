@@ -162,7 +162,7 @@ export default class StateReceiver {
     }
 
     async stopProcessing(): Promise<void> {
-        this.ship.stopProcessing();
+        await this.ship.stopProcessing();
 
         this.handlerDestructors.map(unregister => unregister());
         this.handlerDestructors = [];

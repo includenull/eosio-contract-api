@@ -490,6 +490,18 @@ export default class StateHistoryBlockReader {
         }).then();
     }
 
+    private async cleanupSidecarAndWorkers(): Promise<void> {
+        if (this.deserializeWorkers) {
+            await this.deserializeWorkers.destroy();
+            this.deserializeWorkers = undefined;
+        }
+
+        if (this.sidecarPool) {
+            await this.sidecarPool.stop();
+            this.sidecarPool = undefined;
+        }
+    }
+
     async onClose(): Promise<void> {
         logger.error('Ship Websocket disconnected');
 
@@ -508,14 +520,8 @@ export default class StateHistoryBlockReader {
         this.pendingSidecarResults.clear();
         this.blocksQueue.clear();
 
-        if (this.deserializeWorkers) {
-            await this.deserializeWorkers.destroy();
-            this.deserializeWorkers = undefined;
-        }
-
-        if (this.sidecarPool) {
-            await this.sidecarPool.stop();
-            this.sidecarPool = undefined;
+        if (!this.stopped) {
+            await this.cleanupSidecarAndWorkers();
         }
 
         this.reconnect();
@@ -552,13 +558,15 @@ export default class StateHistoryBlockReader {
         this.connect();
     }
 
-    stopProcessing(): void {
+    async stopProcessing(): Promise<void> {
         this.stopped = true;
 
-        this.ws.close();
+        this.ws?.close();
 
         this.blocksQueue.clear();
         this.blocksQueue.pause();
+
+        await this.cleanupSidecarAndWorkers();
     }
 
     async processBlock(block: ShipBlockResponse): Promise<void> {

@@ -2,6 +2,7 @@
 
 #include "hex_utils.hpp"
 #include "json_msgpack.hpp"
+#include "name_utils.hpp"
 
 #include <abieos.h>
 
@@ -280,24 +281,185 @@ inline size_t abieosMinDecodeSize(
     return result;
 }
 
-inline bool advanceAbieosType(abieos_context* context, EosBinReader& reader, const char* type) {
-    const size_t remaining = reader.remaining();
-    if (remaining == 0) {
+inline bool skipExtensions(EosBinReader& reader);
+inline bool skipSignatures(EosBinReader& reader);
+inline bool skipActionTraceVariant(EosBinReader& reader);
+inline bool skipTransactionTraceTail(
+    abieos_context* context,
+    EosBinReader& reader,
+    const char** failure_step = nullptr
+);
+
+inline bool skipBytesArray(EosBinReader& reader) {
+    uint32_t count = 0;
+    if (!reader.readVaruint32(count)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!reader.skipBytes()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool skipAction(EosBinReader& reader) {
+    return reader.skipName() && reader.skipName() && reader.skipPermissionLevels() && reader.skipBytes();
+}
+
+inline bool skipActionArray(EosBinReader& reader) {
+    uint32_t count = 0;
+    if (!reader.readVaruint32(count)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!skipAction(reader)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool skipPrunableData(EosBinReader& reader) {
+    uint8_t present = 0;
+    if (!reader.readU8(present)) {
+        return false;
+    }
+    if (present == 0) {
+        return true;
+    }
+
+    uint32_t variant_index = 0;
+    if (!reader.readVaruint32(variant_index)) {
         return false;
     }
 
+    if (variant_index == 0) {
+        return skipSignatures(reader) && skipBytesArray(reader);
+    }
+
+    return variant_index == 1;
+}
+
+inline bool skipPartialTransactionV0(EosBinReader& reader) {
+    uint32_t expiration = 0;
+    uint16_t ref_block_num = 0;
+    uint32_t ref_block_prefix = 0;
+    uint32_t max_net_usage_words = 0;
+    uint8_t max_cpu_usage_ms = 0;
+    uint32_t delay_sec = 0;
+
+    if (!reader.readU32(expiration) || !reader.readU16(ref_block_num) || !reader.readU32(ref_block_prefix) ||
+        !reader.readVaruint32(max_net_usage_words) || !reader.readU8(max_cpu_usage_ms) ||
+        !reader.readVaruint32(delay_sec) || !skipExtensions(reader) || !skipSignatures(reader) ||
+        !skipBytesArray(reader)) {
+        return false;
+    }
+
+    return true;
+}
+
+inline bool skipPartialTransactionV1(EosBinReader& reader) {
+    uint32_t expiration = 0;
+    uint16_t ref_block_num = 0;
+    uint32_t ref_block_prefix = 0;
+    uint32_t max_net_usage_words = 0;
+    uint8_t max_cpu_usage_ms = 0;
+    uint32_t delay_sec = 0;
+
+    if (!reader.readU32(expiration) || !reader.readU16(ref_block_num) || !reader.readU32(ref_block_prefix) ||
+        !reader.readVaruint32(max_net_usage_words) || !reader.readU8(max_cpu_usage_ms) ||
+        !reader.readVaruint32(delay_sec) || !skipActionArray(reader) || !skipActionArray(reader) ||
+        !skipExtensions(reader) || !skipPrunableData(reader)) {
+        return false;
+    }
+
+    return true;
+}
+
+inline bool skipOptionalPartialTransaction(abieos_context* context, EosBinReader& reader) {
+    const char* field_start = reader.cursor();
+    const size_t field_remaining = reader.remaining();
+    if (field_remaining == 0) {
+        return false;
+    }
+
+    const uint8_t present = static_cast<uint8_t>(field_start[0]);
+    if (present == 0) {
+        return reader.advance(1);
+    }
+
     const size_t decoded =
-        abieosMinDecodeSize(context, kShipContract, type, reader.cursor(), remaining);
-    if (decoded == 0) {
+        abieosMinDecodeSize(context, kShipContract, "partial_transaction?", field_start, field_remaining);
+    if (decoded == 0 || decoded > field_remaining) {
         return false;
     }
 
     return reader.advance(decoded);
 }
 
-inline std::string nameToString(abieos_context* context, uint64_t name) {
-    const char* value = abieos_name_to_string(context, name);
-    return value ? value : std::string();
+inline bool skipOptionalTransactionTrace(abieos_context* context, EosBinReader& reader) {
+    const char* field_start = reader.cursor();
+    const size_t field_remaining = reader.remaining();
+    if (field_remaining == 0) {
+        return false;
+    }
+
+    const uint8_t present = static_cast<uint8_t>(field_start[0]);
+    if (present == 0) {
+        return reader.advance(1);
+    }
+
+    const size_t decoded =
+        abieosMinDecodeSize(context, kShipContract, "transaction_trace?", field_start, field_remaining);
+    if (decoded == 0 || decoded > field_remaining) {
+        return false;
+    }
+
+    return reader.advance(decoded);
+}
+
+inline bool skipTransactionTraceTail(
+    abieos_context* context,
+    EosBinReader& reader,
+    const char** failure_step
+) {
+    if (!reader.skipOptionalAccountDelta()) {
+        if (failure_step) {
+            *failure_step = "account_ram_delta";
+        }
+        return false;
+    }
+
+    if (!reader.skipOptionalString()) {
+        if (failure_step) {
+            *failure_step = "except";
+        }
+        return false;
+    }
+
+    if (!reader.skipOptionalU64()) {
+        if (failure_step) {
+            *failure_step = "error_code";
+        }
+        return false;
+    }
+
+    if (!skipOptionalTransactionTrace(context, reader)) {
+        if (failure_step) {
+            *failure_step = "failed_dtrx_trace";
+        }
+        return false;
+    }
+
+    if (!skipOptionalPartialTransaction(context, reader)) {
+        if (failure_step) {
+            *failure_step = "partial";
+        }
+        return false;
+    }
+
+    return true;
 }
 
 inline std::string formatBlockTimestamp(uint32_t slot) {
@@ -411,62 +573,99 @@ inline bool skipSignatures(EosBinReader& reader) {
     return true;
 }
 
-inline bool skipTransactionTraceTail(
-    abieos_context* context,
-    EosBinReader& reader,
-    const char** failure_step = nullptr
-) {
-    struct TailField {
-        const char* name;
-        const char* type;
-    };
+inline bool skipOptionalActionReceipt(EosBinReader& reader) {
+    uint8_t present = 0;
+    if (!reader.readU8(present)) {
+        return false;
+    }
+    if (present == 0) {
+        return true;
+    }
 
-    static constexpr TailField fields[] = {
-        {"account_ram_delta", "account_delta?"},
-        {"except", "string?"},
-        {"error_code", "uint64?"},
-        {"failed_dtrx_trace", "transaction_trace?"},
-        {"partial", "partial_transaction?"},
-    };
+    const char* start = reader.cursor();
+    const size_t remaining = reader.remaining();
+    if (remaining == 0) {
+        return false;
+    }
 
-    for (const auto& field : fields) {
-        if (!advanceAbieosType(context, reader, field.type)) {
-            if (failure_step) {
-                *failure_step = field.name;
+    // action_receipt is a single-member variant, so the index is often omitted.
+    if (remaining >= 1) {
+        const uint8_t first = static_cast<uint8_t>(start[0]);
+        if (first <= 1) {
+            EosBinReader with_index(start, remaining);
+            if (with_index.skipActionReceiptVariant()) {
+                return reader.advance(static_cast<size_t>(with_index.cursor() - start));
             }
-            return false;
         }
     }
 
-    return true;
+    EosBinReader body_only(start, remaining);
+    if (body_only.skipActionReceiptBody()) {
+        return reader.advance(static_cast<size_t>(body_only.cursor() - start));
+    }
+
+    return false;
 }
 
-inline bool skipActionTraceTail(EosBinReader& reader) {
-    uint8_t ignored_u8 = 0;
-    int64_t ignored_i64 = 0;
-    return reader.readU8(ignored_u8) && reader.readI64(ignored_i64) && reader.skipString() &&
-        reader.skipAccountDeltas() && reader.skipOptionalString() && reader.skipOptionalU64();
+inline bool skipActionTraceCommonTail(EosBinReader& reader) {
+    uint8_t context_free = 0;
+    int64_t elapsed = 0;
+    if (!reader.readU8(context_free) || !reader.readI64(elapsed) || !reader.skipString()) {
+        return false;
+    }
+    if (!reader.skipAccountDeltas()) {
+        return false;
+    }
+    if (!reader.skipOptionalString()) {
+        return false;
+    }
+    return reader.skipOptionalU64();
 }
 
-inline bool skipActionTraceV0(EosBinReader& reader) {
-    uint32_t ignored_u32 = 0;
-    if (!reader.readVaruint32(ignored_u32) || !reader.readVaruint32(ignored_u32)) {
+inline bool skipActionTraceV0Body(EosBinReader& reader) {
+    uint32_t ignored = 0;
+    if (!reader.readVaruint32(ignored) || !reader.readVaruint32(ignored)) {
         return false;
     }
-
-    uint8_t has_receipt = 0;
-    if (!reader.readU8(has_receipt)) {
+    if (!skipOptionalActionReceipt(reader)) {
         return false;
     }
-    if (has_receipt && !reader.skipActionReceiptVariant()) {
-        return false;
-    }
-
     if (!reader.skipName()) {
         return false;
     }
+    if (!skipAction(reader)) {
+        return false;
+    }
+    return skipActionTraceCommonTail(reader);
+}
 
-    if (!reader.skipName() || !reader.skipName()) {
+inline bool skipActionTraceVariant(EosBinReader& reader) {
+    uint32_t variant_index = 0;
+    if (!reader.readVaruint32(variant_index)) {
+        return false;
+    }
+
+    if (variant_index == 0) {
+        return skipActionTraceV0Body(reader);
+    }
+
+    if (variant_index == 1) {
+        return skipActionTraceV0Body(reader) && reader.skipBytes();
+    }
+
+    return false;
+}
+
+inline bool parseActionReceiptBody(EosBinReader& reader, SlimActionTrace& out) {
+    uint64_t receipt_receiver = 0;
+    if (!reader.readName(receipt_receiver) || !reader.readChecksum256(out.act_digest) ||
+        !reader.readU64(out.global_sequence)) {
+        return false;
+    }
+    out.receipt_receiver = nameToString(receipt_receiver);
+
+    uint64_t recv_sequence = 0;
+    if (!reader.readU64(recv_sequence)) {
         return false;
     }
 
@@ -475,74 +674,81 @@ inline bool skipActionTraceV0(EosBinReader& reader) {
         return false;
     }
     for (uint32_t i = 0; i < auth_count; ++i) {
-        if (!reader.skipName() || !reader.skipName()) {
+        if (!reader.skipName() || !reader.readU64(recv_sequence)) {
             return false;
         }
     }
 
-    if (!reader.skipBytes()) {
-        return false;
-    }
-
-    return skipActionTraceTail(reader);
+    uint32_t code_sequence = 0;
+    uint32_t abi_sequence = 0;
+    return reader.readVaruint32(code_sequence) && reader.readVaruint32(abi_sequence);
 }
 
-inline bool parseActionTraceV0(EosBinReader& reader, abieos_context* context, SlimActionTrace& out) {
-    if (!reader.readVaruint32(out.action_ordinal) || !reader.readVaruint32(out.creator_action_ordinal)) {
-        return false;
-    }
-
+inline bool parseOptionalActionReceipt(EosBinReader& reader, SlimActionTrace& out) {
     uint8_t has_receipt = 0;
     if (!reader.readU8(has_receipt)) {
         return false;
     }
 
     out.has_receipt = has_receipt != 0;
-    if (out.has_receipt) {
-        uint32_t receipt_variant = 0;
-        if (!reader.readVaruint32(receipt_variant) || receipt_variant != 0) {
-            return false;
-        }
+    if (!out.has_receipt) {
+        return true;
+    }
 
-        uint64_t receipt_receiver = 0;
-        if (!reader.readName(receipt_receiver) || !reader.readChecksum256(out.act_digest) ||
-            !reader.readU64(out.global_sequence)) {
-            return false;
-        }
-        out.receipt_receiver = nameToString(context, receipt_receiver);
-        uint64_t recv_sequence = 0;
-        if (!reader.readU64(recv_sequence)) {
-            return false;
-        }
-        uint32_t auth_count = 0;
-        if (!reader.readVaruint32(auth_count)) {
-            return false;
-        }
-        for (uint32_t i = 0; i < auth_count; ++i) {
-            if (!reader.skipName() || !reader.readU64(recv_sequence)) {
-                return false;
+    const char* start = reader.cursor();
+    const size_t remaining = reader.remaining();
+    if (remaining == 0) {
+        return false;
+    }
+
+    if (remaining >= 1) {
+        const uint8_t first = static_cast<uint8_t>(start[0]);
+        if (first <= 1) {
+            EosBinReader with_index(start, remaining);
+            uint32_t receipt_variant = 0;
+            if (with_index.readVaruint32(receipt_variant) && receipt_variant == 0) {
+                SlimActionTrace trial;
+                if (parseActionReceiptBody(with_index, trial)) {
+                    reader.advance(static_cast<size_t>(with_index.cursor() - start));
+                    out.receipt_receiver = std::move(trial.receipt_receiver);
+                    out.act_digest = std::move(trial.act_digest);
+                    out.global_sequence = trial.global_sequence;
+                    return true;
+                }
             }
         }
-        uint32_t code_sequence = 0;
-        uint32_t abi_sequence = 0;
-        if (!reader.readVaruint32(code_sequence) || !reader.readVaruint32(abi_sequence)) {
-            return false;
-        }
+    }
+
+    EosBinReader body_only(start, remaining);
+    if (!parseActionReceiptBody(body_only, out)) {
+        return false;
+    }
+
+    return reader.advance(static_cast<size_t>(body_only.cursor() - start));
+}
+
+inline bool parseActionTraceV0(EosBinReader& reader, SlimActionTrace& out) {
+    if (!reader.readVaruint32(out.action_ordinal) || !reader.readVaruint32(out.creator_action_ordinal)) {
+        return false;
+    }
+
+    if (!parseOptionalActionReceipt(reader, out)) {
+        return false;
     }
 
     uint64_t receiver_name = 0;
     if (!reader.readName(receiver_name)) {
         return false;
     }
-    out.receiver = nameToString(context, receiver_name);
+    out.receiver = nameToString(receiver_name);
 
     uint64_t account_name = 0;
     uint64_t action_name = 0;
     if (!reader.readName(account_name) || !reader.readName(action_name)) {
         return false;
     }
-    out.account = nameToString(context, account_name);
-    out.action = nameToString(context, action_name);
+    out.account = nameToString(account_name);
+    out.action = nameToString(action_name);
 
     uint32_t auth_count = 0;
     if (!reader.readVaruint32(auth_count)) {
@@ -554,31 +760,14 @@ inline bool parseActionTraceV0(EosBinReader& reader, abieos_context* context, Sl
         if (!reader.readName(actor) || !reader.readName(permission)) {
             return false;
         }
-        out.authorization.emplace_back(nameToString(context, actor), nameToString(context, permission));
+        out.authorization.emplace_back(nameToString(actor), nameToString(permission));
     }
 
     if (!reader.readBytes(out.act_data)) {
         return false;
     }
 
-    return skipActionTraceTail(reader);
-}
-
-inline bool skipActionTraceVariant(EosBinReader& reader) {
-    uint32_t variant_index = 0;
-    if (!reader.readVaruint32(variant_index)) {
-        return false;
-    }
-
-    if (variant_index == 0) {
-        return skipActionTraceV0(reader);
-    }
-
-    if (variant_index == 1) {
-        return skipActionTraceV0(reader) && reader.skipBytes();
-    }
-
-    return false;
+    return skipActionTraceCommonTail(reader);
 }
 
 inline void appendSlimActionTraceMsgpack(
@@ -678,6 +867,12 @@ inline std::vector<char> filterTracesBinaryMsgpack(
             throw std::runtime_error("unsupported transaction_trace variant index");
         }
 
+        const char* tx_body = reader.cursor();
+        const size_t tx_size = reader.remaining();
+        if (tx_size < 33) {
+            throw std::runtime_error("invalid transaction_trace_v0 header");
+        }
+
         std::string tx_id;
         uint8_t status = 0;
         uint32_t cpu_usage_us = 0;
@@ -700,26 +895,25 @@ inline std::vector<char> filterTracesBinaryMsgpack(
         }
 
         std::vector<std::vector<char>> kept_action_traces;
+        bool tx_parsed = true;
 
         if (status == 0) {
-            for (uint32_t i = 0; i < action_count; ++i) {
+            for (uint32_t i = 0; i < action_count && tx_parsed; ++i) {
                 uint32_t action_variant = 0;
-                if (!reader.readVaruint32(action_variant)) {
-                    throw std::runtime_error("invalid action_trace variant");
-                }
-
-                if (action_variant > 1) {
-                    throw std::runtime_error(
-                        "unsupported action_trace variant index: " + std::to_string(action_variant));
+                if (!reader.readVaruint32(action_variant) || action_variant > 1) {
+                    tx_parsed = false;
+                    break;
                 }
 
                 SlimActionTrace trace;
-                if (!parseActionTraceV0(reader, context, trace)) {
-                    throw std::runtime_error("failed to parse action_trace");
+                if (!parseActionTraceV0(reader, trace)) {
+                    tx_parsed = false;
+                    break;
                 }
 
                 if (action_variant == 1 && !reader.skipBytes()) {
-                    throw std::runtime_error("failed to skip action_trace_v1 return_value");
+                    tx_parsed = false;
+                    break;
                 }
 
                 if (!trace.has_receipt || !traceAllowedBinary(trace.account, trace.action, filters) ||
@@ -732,26 +926,40 @@ inline std::vector<char> filterTracesBinaryMsgpack(
                 kept_action_traces.push_back(std::move(encoded));
             }
         } else {
-            for (uint32_t i = 0; i < action_count; ++i) {
+            for (uint32_t i = 0; i < action_count && tx_parsed; ++i) {
                 if (!skipActionTraceVariant(reader)) {
-                    throw std::runtime_error("failed to skip failed transaction action trace");
+                    tx_parsed = false;
+                    break;
                 }
             }
         }
 
         const char* tail_failure = nullptr;
-        if (!skipTransactionTraceTail(context, reader, &tail_failure)) {
-            throw std::runtime_error(
-                std::string("failed to skip transaction tail at ") + (tail_failure ? tail_failure : "unknown"));
+        if (tx_parsed && !skipTransactionTraceTail(context, reader, &tail_failure)) {
+            tx_parsed = false;
         }
 
-        if (status != 0 || kept_action_traces.empty()) {
+        if (!tx_parsed) {
+            const size_t consumed = static_cast<size_t>(reader.cursor() - tx_body);
+            size_t decoded =
+                abieosMinDecodeSize(context, kShipContract, "transaction_trace_v0", tx_body, tx_size);
+            if (decoded == 0 || decoded > tx_size) {
+                decoded = abieosMinDecodeSize(context, kShipContract, "transaction_trace", tx_body, tx_size);
+            }
+            if (decoded == 0 || decoded <= consumed) {
+                throw std::runtime_error(
+                    std::string("failed to parse transaction_trace element at tail ") +
+                    (tail_failure ? tail_failure : "unknown"));
+            }
+            reader.advance(decoded - consumed);
             continue;
         }
 
-        std::vector<char> encoded_tx;
-        appendSlimTransactionMsgpack(encoded_tx, tx_id, kept_action_traces);
-        transactions.push_back(std::move(encoded_tx));
+        if (status == 0 && !kept_action_traces.empty()) {
+            std::vector<char> encoded_tx;
+            appendSlimTransactionMsgpack(encoded_tx, tx_id, kept_action_traces);
+            transactions.push_back(std::move(encoded_tx));
+        }
     }
 
     std::vector<char> out;
@@ -772,7 +980,6 @@ struct ContractRowHeader {
 };
 
 inline bool parseContractRowHeader(
-    abieos_context* context,
     const char* data,
     size_t size,
     ContractRowHeader& out
@@ -792,10 +999,10 @@ inline bool parseContractRowHeader(
         return false;
     }
 
-    out.code = nameToString(context, code_name);
-    out.scope = nameToString(context, scope_name);
-    out.table = nameToString(context, table_name);
-    out.payer = nameToString(context, payer_name);
+    out.code = nameToString(code_name);
+    out.scope = nameToString(scope_name);
+    out.table = nameToString(table_name);
+    out.payer = nameToString(payer_name);
     return true;
 }
 
@@ -822,7 +1029,6 @@ inline void appendContractRowMsgpack(std::vector<char>& out, bool present, const
 }
 
 inline std::vector<char> filterDeltasBinaryMsgpack(
-    abieos_context* context,
     const char* data,
     size_t size,
     const std::unordered_set<std::string>& delta_types,
@@ -868,7 +1074,7 @@ inline std::vector<char> filterDeltasBinaryMsgpack(
                 }
 
                 ContractRowHeader row;
-                if (!parseContractRowHeader(context, row_bytes.data(), row_bytes.size(), row)) {
+                if (!parseContractRowHeader(row_bytes.data(), row_bytes.size(), row)) {
                     throw std::runtime_error("failed to parse contract_row header");
                 }
 
@@ -915,8 +1121,32 @@ inline std::vector<char> filterDeltasBinaryMsgpack(
     return out;
 }
 
+inline void skipOptionalSignedBlockVariant(EosBinReader& reader) {
+    if (reader.remaining() == 0) {
+        return;
+    }
+
+    const char* start = reader.cursor();
+    const uint8_t first = static_cast<uint8_t>(start[0]);
+    if (first > 1) {
+        return;
+    }
+
+    EosBinReader peek(start, reader.remaining());
+    uint32_t variant_index = 0;
+    if (!peek.readVaruint32(variant_index) || variant_index > 1) {
+        return;
+    }
+
+    const size_t prefix = static_cast<size_t>(peek.cursor() - start);
+    if (prefix != 1) {
+        return;
+    }
+
+    reader.advance(prefix);
+}
+
 inline std::vector<char> extractSlimBlockMsgpack(
-    abieos_context* context,
     uint32_t version,
     const char* data,
     size_t size
@@ -929,10 +1159,7 @@ inline std::vector<char> extractSlimBlockMsgpack(
 
     EosBinReader reader(data, size);
     if (version != 0) {
-        uint32_t variant_index = 0;
-        if (!reader.readVaruint32(variant_index) || variant_index != 1) {
-            throw std::runtime_error("unsupported signed_block variant index");
-        }
+        skipOptionalSignedBlockVariant(reader);
     }
 
     uint32_t timestamp = 0;
@@ -942,7 +1169,7 @@ inline std::vector<char> extractSlimBlockMsgpack(
     }
 
     const std::string timestamp_str = formatBlockTimestamp(timestamp);
-    const std::string producer = nameToString(context, producer_name);
+    const std::string producer = nameToString(producer_name);
 
     std::vector<char> out;
     if (version == 0) {

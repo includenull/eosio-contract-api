@@ -310,11 +310,22 @@ class ShipSidecarWorker {
         this.process = spawn(this.executablePath, ['--stdio', '--threads', '1'], {
             stdio: ['pipe', 'pipe', 'pipe'],
             windowsHide: true,
+            env: {
+                ...process.env,
+                SHIP_SIDECAR_PROFILE: process.env.SHIP_SIDECAR_PROFILE ?? '/tmp/ship-sidecar-latest.prof',
+            },
         });
 
         this.process.stdout.on('data', (chunk: Buffer) => {
             this.inbound.append(chunk);
             this.drainInbound();
+        });
+
+        this.process.stderr.on('data', (chunk: Buffer) => {
+            const message = chunk.toString('utf8').trim();
+            if (message) {
+                logger.info(`ship-sidecar #${this.workerId}: ${message}`);
+            }
         });
 
         this.process.on('exit', () => {
@@ -330,13 +341,41 @@ class ShipSidecarWorker {
             return;
         }
 
+        const child = this.process;
+
+        // Op 255 stops the reader loop but does not send a response frame.
         try {
-            await this.request(OP_SHUTDOWN, Buffer.alloc(0));
+            const requestId = this.nextRequestId++;
+            const frame = buildFrame(requestId, OP_SHUTDOWN, Buffer.alloc(0));
+            await this.writeQueue.then(() => this.writeFrame(frame));
+            this.pending.delete(requestId);
         } catch {
-            // ignore shutdown errors
+            // ignore shutdown write errors
         }
 
-        this.process.kill();
+        if (!child.killed) {
+            await new Promise<void>((resolve) => {
+                const forceTermTimeout = setTimeout(() => {
+                    if (!child.killed) {
+                        child.kill('SIGTERM');
+                    }
+                }, 5000);
+
+                const forceKillTimeout = setTimeout(() => {
+                    if (!child.killed) {
+                        child.kill('SIGKILL');
+                    }
+                    resolve();
+                }, 8000);
+
+                child.once('exit', () => {
+                    clearTimeout(forceTermTimeout);
+                    clearTimeout(forceKillTimeout);
+                    resolve();
+                });
+            });
+        }
+
         this.process = null;
         this.closed = true;
     }
@@ -450,9 +489,23 @@ class ShipSidecarWorker {
     private writeFrame(frame: Buffer): Promise<void> {
         return new Promise((resolve, reject) => {
             const stdin = this.process!.stdin;
-            const ok = stdin.write(frame, (error) => {
+
+            const finish = (error?: Error) => {
+                stdin.off('drain', onDrain);
+                stdin.off('error', onError);
                 if (error) {
                     reject(error);
+                } else {
+                    resolve();
+                }
+            };
+
+            const onDrain = () => finish();
+            const onError = (error: Error) => finish(error);
+
+            const ok = stdin.write(frame, (error) => {
+                if (error) {
+                    finish(error);
                 }
             });
 
@@ -461,8 +514,8 @@ class ShipSidecarWorker {
                 return;
             }
 
-            stdin.once('drain', resolve);
-            stdin.once('error', reject);
+            stdin.once('drain', onDrain);
+            stdin.once('error', onError);
         });
     }
 
