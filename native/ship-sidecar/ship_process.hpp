@@ -2,6 +2,7 @@
 
 #include "hex_utils.hpp"
 #include "json_msgpack.hpp"
+#include "ship_binary.hpp"
 #include "ship_envelope.hpp"
 
 #include <abieos.h>
@@ -16,18 +17,6 @@
 #include <rapidjson/document.h>
 
 namespace ship_sidecar {
-
-constexpr uint64_t kShipContract = 2;
-
-struct TraceFilterRule {
-    std::string contract;
-    std::string action;
-};
-
-struct TableFilterRule {
-    std::string code;
-    std::string table;
-};
 
 inline std::string abieosTypeToJson(abieos_context* context, const std::string& type, const char* data, size_t size) {
     const char* json = abieos_bin_to_json(context, kShipContract, type.c_str(), data, size);
@@ -401,21 +390,31 @@ inline std::vector<char> processParsedBlocksResultMsgpack(
     const std::vector<TraceFilterRule>& trace_filters,
     const std::vector<TableFilterRule>& table_filters
 ) {
-    rapidjson::Document block_doc = buildBlockDocument(context, parsed.version, parsed.block, parsed.has_block);
-    rapidjson::Document traces_doc;
-    rapidjson::Document deltas_doc;
-
-    if (parsed.has_traces && !parsed.traces.empty()) {
-        traces_doc = filterTracesDocument(context, parsed.traces.data(), parsed.traces.size(), trace_filters);
+    std::vector<char> block_msgpack;
+    if (!parsed.has_block || parsed.block.empty()) {
+        block_msgpack.clear();
+        appendMsgpackNull(block_msgpack);
     } else {
-        traces_doc.SetArray();
+        block_msgpack = extractSlimBlockMsgpack(
+            context, parsed.version, parsed.block.data(), parsed.block.size());
     }
 
+    std::vector<char> traces_msgpack;
+    if (parsed.has_traces && !parsed.traces.empty()) {
+        traces_msgpack = filterTracesBinaryMsgpack(
+            context, parsed.traces.data(), parsed.traces.size(), trace_filters);
+    } else {
+        traces_msgpack.clear();
+        appendMsgpackArrayHeader(traces_msgpack, 0);
+    }
+
+    std::vector<char> deltas_msgpack;
     if (parsed.has_deltas && !parsed.deltas.empty()) {
-        deltas_doc = filterDeltasDocument(
+        deltas_msgpack = filterDeltasBinaryMsgpack(
             context, parsed.deltas.data(), parsed.deltas.size(), delta_types, table_filters);
     } else {
-        deltas_doc.SetArray();
+        deltas_msgpack.clear();
+        appendMsgpackArrayHeader(deltas_msgpack, 0);
     }
 
     std::vector<char> out;
@@ -441,13 +440,13 @@ inline std::vector<char> processParsedBlocksResultMsgpack(
     appendOptionalBlockPositionMsgpack(out, parsed.prev_block);
 
     appendMsgpackKey(out, "block", 5);
-    appendMsgpackValue(out, block_doc);
+    appendMsgpackBytes(out, block_msgpack);
 
     appendMsgpackKey(out, "traces", 6);
-    appendMsgpackValue(out, traces_doc);
+    appendMsgpackBytes(out, traces_msgpack);
 
     appendMsgpackKey(out, "deltas", 6);
-    appendMsgpackValue(out, deltas_doc);
+    appendMsgpackBytes(out, deltas_msgpack);
 
     appendMsgpackKey(out, "deltas_processed", 16);
     appendMsgpackBool(out, true);

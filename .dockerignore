@@ -1,5 +1,6 @@
 logs
 build
+native/ship-sidecar/build
 test
 node_modules
 config
