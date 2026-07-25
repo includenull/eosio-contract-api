@@ -22,6 +22,7 @@ import { ContractHandler } from './handlers/interfaces.js';
 import ApiNotificationSender from './notifier.js';
 import Semaphore from '../utils/semaphore.js';
 import { ModuleLoader } from './modules.js';
+import ContractDeserializer, { ContractDeserializeRequest } from './contract-deserializer.js';
 
 type AbiCache = {
     contractAbi: ABI | null;
@@ -59,6 +60,7 @@ export default class StateReceiver {
 
     private readonly abis: {[key: string]: AbiCache};
     private readonly shipMinBlockConfirmation: number;
+    private readonly contractDeserializer: ContractDeserializer;
 
     constructor(
         readonly config: IReaderConfig,
@@ -86,6 +88,12 @@ export default class StateReceiver {
             allow_empty_traces: false,
             allow_empty_blocks: false
         });
+
+        this.contractDeserializer = new ContractDeserializer(
+            () => this.ship.getSidecarPool(),
+            config.ds_contract_threads ?? config.ds_ship_threads ?? 4,
+            config.ds_use_sidecar ?? false
+        );
 
         this.dsQueue = new PQueue({concurrency: 1, autoStart: true});
         this.dsLock = new Semaphore(config.ship_ds_queue_size);
@@ -148,6 +156,8 @@ export default class StateReceiver {
 
         this.handlerDestructors.map(unregister => unregister());
         this.handlerDestructors = [];
+
+        await this.contractDeserializer.destroy();
 
         logger.info('Reader stopped at block #' + this.currentBlock);
     }
@@ -417,6 +427,8 @@ export default class StateReceiver {
 
             this.abis[action.data.account] = { contractAbi, block_num: block.block_num };
 
+            await this.contractDeserializer.registerAbi(action.data.account, contractAbi);
+
             try {
                 await this.connection.database.query(
                     'INSERT into contract_abis (account, abi, block_num, block_time) VALUES ($1, $2, $3, $4)',
@@ -468,32 +480,91 @@ export default class StateReceiver {
         const traces = extractShipTraces(data);
 
         for (const row of traces) {
-            const act = row.trace.act;
-
-            act.data = <any>{
-                binary: act.data,
+            row.trace.act.data = <any>{
+                binary: row.trace.act.data,
                 block_num: null,
                 json: null
             };
+        }
 
+        type TraceJob = {
+            traceIndex: number;
+            contract: string;
+            action: string;
+        };
+
+        const jobs: TraceJob[] = [];
+
+        for (let traceIndex = 0; traceIndex < traces.length; traceIndex++) {
+            const row = traces[traceIndex];
+            const act = row.trace.act;
             const processingInfo = this.processor.actionTraceNeeded(act.account, act.name);
 
             if (processingInfo.deserialize && this.modules.checkRawTrace(blockNum, row.tx, row.trace)) {
-                try {
-                    const abi = await this.fetchContractAbi(act.account, blockNum);
-                    const type = getActionAbiType(abi.contractAbi!, act.account, act.name);
-
-                    act.data = <any>{
-                        // @ts-ignore
-                        binary: act.data.binary,
-                        // @ts-ignore
-                        json: deserializeEosioType(type, act.data.binary, abi.contractAbi!, false),
-                        block_num: abi.block_num
-                    };
-                } catch (e) {
-                    logger.warn('Failed to deserialize trace ' + act.account + ':' + act.name + ' in preprocessing', e);
-                }
+                jobs.push({
+                    traceIndex,
+                    contract: act.account,
+                    action: act.name,
+                });
             }
+        }
+
+        if (jobs.length === 0) {
+            return traces;
+        }
+
+        const abiByContract = new Map<string, AbiCache>();
+
+        for (const contract of new Set(jobs.map(job => job.contract))) {
+            abiByContract.set(contract, await this.fetchContractAbi(contract, blockNum));
+        }
+
+        const requests: ContractDeserializeRequest[] = [];
+        const requestTargets: TraceJob[] = [];
+
+        for (const job of jobs) {
+            const abi = abiByContract.get(job.contract);
+
+            if (!abi?.contractAbi) {
+                continue;
+            }
+
+            try {
+                requests.push({
+                    contract: job.contract,
+                    type: getActionAbiType(abi.contractAbi, job.contract, job.action),
+                    data: traces[job.traceIndex].trace.act.data.binary,
+                    abi: abi.contractAbi,
+                });
+                requestTargets.push(job);
+            } catch (e) {
+                logger.warn('Failed to resolve action ABI type ' + job.contract + ':' + job.action, e);
+            }
+        }
+
+        if (requests.length === 0) {
+            return traces;
+        }
+
+        let results: unknown[];
+
+        try {
+            results = await this.contractDeserializer.deserializeBatch(requests);
+        } catch (e) {
+            logger.warn('Failed to deserialize action traces in preprocessing', e);
+            return traces;
+        }
+
+        for (let i = 0; i < results.length; i++) {
+            const job = requestTargets[i];
+            const abi = abiByContract.get(job.contract)!;
+            const act = traces[job.traceIndex].trace.act;
+
+            act.data = <any>{
+                binary: act.data.binary,
+                json: results[i],
+                block_num: abi.block_num
+            };
         }
 
         return traces;
@@ -508,25 +579,84 @@ export default class StateReceiver {
                 block_num: null,
                 json: null
             };
+        }
 
+        type RowJob = {
+            rowIndex: number;
+            contract: string;
+            table: string;
+        };
+
+        const jobs: RowJob[] = [];
+
+        for (let rowIndex = 0; rowIndex < deltas.length; rowIndex++) {
+            const delta = deltas[rowIndex];
             const processingInfo = this.processor.contractRowNeeded(delta.code, delta.table);
 
             if (processingInfo.deserialize && this.modules.checkRawDelta(blockNum, delta)) {
-                try {
-                    const abi = await this.fetchContractAbi(delta.code, blockNum);
-                    const type = getTableAbiType(abi.contractAbi!, delta.code, delta.table);
-
-                    delta.value = <any>{
-                        // @ts-ignore
-                        binary: delta.value.binary,
-                        // @ts-ignore
-                        json: deserializeEosioType(type, delta.value.binary, abi.contractAbi!),
-                        block_num: abi.block_num
-                    };
-                } catch (e) {
-                    logger.warn('Failed to deserialize table ' + delta.code + ':' + delta.table + ' in preprocessing', e);
-                }
+                jobs.push({
+                    rowIndex,
+                    contract: delta.code,
+                    table: delta.table,
+                });
             }
+        }
+
+        if (jobs.length === 0) {
+            return deltas;
+        }
+
+        const abiByContract = new Map<string, AbiCache>();
+
+        for (const contract of new Set(jobs.map(job => job.contract))) {
+            abiByContract.set(contract, await this.fetchContractAbi(contract, blockNum));
+        }
+
+        const requests: ContractDeserializeRequest[] = [];
+        const requestTargets: RowJob[] = [];
+
+        for (const job of jobs) {
+            const abi = abiByContract.get(job.contract);
+
+            if (!abi?.contractAbi) {
+                continue;
+            }
+
+            try {
+                requests.push({
+                    contract: job.contract,
+                    type: getTableAbiType(abi.contractAbi, job.contract, job.table),
+                    data: deltas[job.rowIndex].value.binary,
+                    abi: abi.contractAbi,
+                });
+                requestTargets.push(job);
+            } catch (e) {
+                logger.warn('Failed to resolve table ABI type ' + job.contract + ':' + job.table, e);
+            }
+        }
+
+        if (requests.length === 0) {
+            return deltas;
+        }
+
+        let results: unknown[];
+
+        try {
+            results = await this.contractDeserializer.deserializeBatch(requests);
+        } catch (e) {
+            logger.warn('Failed to deserialize contract rows in preprocessing', e);
+            return deltas;
+        }
+
+        for (let i = 0; i < results.length; i++) {
+            const job = requestTargets[i];
+            const abi = abiByContract.get(job.contract)!;
+
+            deltas[job.rowIndex].value = <any>{
+                binary: deltas[job.rowIndex].value.binary,
+                json: results[i],
+                block_num: abi.block_num
+            };
         }
 
         return deltas;

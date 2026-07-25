@@ -11,6 +11,7 @@ import {
     IBlockReaderOptions, ShipBlockResponse
 } from '../types/ship.js';
 import { deserializeEosioType, serializeEosioType } from '../utils/eosio.js';
+import { parseShipBlocksResult } from '../utils/ship-envelope.js';
 import { createShipSidecarPool, ShipSidecarPool } from './ship-sidecar-client.js';
 
 export type BlockConsumer = (block: ShipBlockResponse) => any;
@@ -177,163 +178,197 @@ export default class StateHistoryBlockReader {
 
     private handleShipResult(data: any): void {
         try {
+                if (this.sidecarPool) {
+                    this.handleShipResultViaSidecar(data);
+                    return;
+                }
+
                 const [type, response] = deserializeEosioType('result', data, this.shipAbi);
 
-                if (['get_blocks_result_v0', 'get_blocks_result_v1', 'get_blocks_result_v2'].indexOf(type) >= 0) {
-                    const config: {[key: string]: {version: number }} = {
-                        'get_blocks_result_v0': {version: 0},
-                        'get_blocks_result_v1': {version: 1},
-                        'get_blocks_result_v2': {version: 2}
-                    };
-
-                    let block: any = null;
-                    let traces: any = [];
-                    let deltas: any = [];
-
-                    if (response.this_block) {
-                        if (this.sidecarPool) {
-                            const sidecarResult = this.deserializeBlockViaSidecar(type, config[type].version, response);
-                            block = sidecarResult.then(result => result.block);
-                            traces = sidecarResult.then(result => result.traces);
-                            deltas = sidecarResult.then(result => result.deltas);
-                        } else if (response.block) {
-                            if (config[type].version === 2) {
-                                block = this.deserializeParallel('signed_block_variant', response.block)
-                                    .then((res: any) => {
-                                        if (res[0] === 'signed_block_v1') {
-                                            return res[1];
-                                        }
-
-                                        throw new Error('Unsupported block type received ' + res[0]);
-                                    });
-                            } else if (config[type].version === 1) {
-                                if (response.block[0] === 'signed_block_v1') {
-                                    block = response.block[1];
-                                } else {
-                                    block = Promise.reject(new Error('Unsupported block type received ' + response.block[0]));
-                                }
-                            } else if (config[type].version === 0) {
-                                block = this.deserializeParallel('signed_block', response.block);
-                            } else {
-                                block = Promise.reject(new Error('Unsupported result type received ' + type));
-                            }
-                        } else if(this.currentArgs.fetch_block) {
-                            if (this.options.allow_empty_blocks) {
-                                logger.warn('Block #' + response.this_block.block_num + ' does not contain block data');
-                            } else {
-                                logger.error('Block #' + response.this_block.block_num + ' does not contain block data');
-
-                                return this.blocksQueue.pause();
-                            }
-                        }
-
-                        if (!this.sidecarPool && response.traces) {
-                            traces = this.deserializeParallel('transaction_trace[]', response.traces);
-                        } else if (!this.sidecarPool && this.currentArgs.fetch_traces) {
-                            if (this.options.allow_empty_traces) {
-                                logger.warn('Block #' + response.this_block.block_num + ' does not contain trace data');
-                            } else {
-                                logger.error('Block #' + response.this_block.block_num + ' does not contain trace data');
-
-                                return this.blocksQueue.pause();
-                            }
-                        }
-
-                        if (!this.sidecarPool && response.deltas) {
-                            deltas = this.deserializeParallel('table_delta[]', response.deltas)
-                                .then(res => this.deserializeDeltas(res));
-                        } else if (!this.sidecarPool && this.currentArgs.fetch_deltas) {
-                            if (this.options.allow_empty_deltas) {
-                                logger.warn('Block #' + response.this_block.block_num + ' does not contain delta data');
-                            } else {
-                                logger.error('Block #' + response.this_block.block_num + ' does not contain delta data');
-
-                                return this.blocksQueue.pause();
-                            }
-                        }
-                    }
-
-                    this.blocksQueue.add(async () => {
-                        if (response.this_block) {
-                            this.currentArgs.start_block_num = response.this_block.block_num + 1;
-                        } else {
-                            this.currentArgs.start_block_num += 1;
-                        }
-
-                        if (response.this_block && response.last_irreversible) {
-                            this.currentArgs.have_positions = this.currentArgs.have_positions.filter(
-                                row => row.block_num > response.last_irreversible.block_num && row.block_num < response.this_block.block_num
-                            );
-
-                            if (response.this_block.block_num > response.last_irreversible.block_num) {
-                                this.currentArgs.have_positions.push(response.this_block);
-                            }
-                        }
-
-                        let deserializedTraces = [];
-                        let deserializedDeltas = [];
-
-                        try {
-                            deserializedTraces = await traces;
-                        } catch (error) {
-                            logger.error('Failed to deserialize traces at block #' + response.this_block.block_num, error);
-
-                            this.blocksQueue.clear();
-                            this.blocksQueue.pause();
-
-                            throw error;
-                        }
-
-                        try {
-                            deserializedDeltas = await deltas;
-                        } catch (error) {
-                            logger.error('Failed to deserialize deltas at block #' + response.this_block.block_num, error);
-
-                            this.blocksQueue.clear();
-                            this.blocksQueue.pause();
-
-                            throw error;
-                        }
-
-                        try {
-                            await this.processBlock({
-                                this_block: response.this_block,
-                                head: response.head,
-                                last_irreversible: response.last_irreversible,
-                                prev_block: response.prev_block,
-                                block: Object.assign(
-                                    {...response.this_block},
-                                    await block,
-                                    {last_irreversible: response.last_irreversible},
-                                    {head: response.head}
-                                ),
-                                traces: deserializedTraces,
-                                deltas: deserializedDeltas
-                            });
-                        } catch (error) {
-                            logger.error('Ship blocks queue stopped due to an error at #' + response.this_block.block_num, error);
-
-                            this.blocksQueue.clear();
-                            this.blocksQueue.pause();
-
-                            throw error;
-                        }
-
-                        this.unconfirmed += 1;
-
-                        if (this.unconfirmed >= this.options.min_block_confirmation) {
-                            this.send(['get_blocks_ack_request_v0', { num_messages: this.unconfirmed }]);
-                            this.unconfirmed = 0;
-                        }
-                    }).then();
-                } else {
-                    logger.warn('Not supported message received', {type, response});
-                }
+                this.enqueueBlocksResult(type, response);
         } catch (e) {
             logger.error(e);
 
             this.ws.close();
         }
+    }
+
+    private handleShipResultViaSidecar(data: Uint8Array | Buffer): void {
+        const parsed = parseShipBlocksResult(data, this.shipAbi!);
+
+        if (!parsed) {
+            const [type, response] = deserializeEosioType('result', data, this.shipAbi!);
+            logger.warn('Not supported message received', { type, response });
+            return;
+        }
+
+        const response = {
+            head: parsed.head,
+            last_irreversible: parsed.last_irreversible,
+            this_block: parsed.this_block,
+            prev_block: parsed.prev_block,
+            block: parsed.block,
+            traces: parsed.traces,
+            deltas: parsed.deltas,
+        };
+
+        this.enqueueBlocksResult(parsed.resultType, response, parsed.version);
+    }
+
+    private enqueueBlocksResult(type: string, response: any, resultVersion?: number): void {
+        if (['get_blocks_result_v0', 'get_blocks_result_v1', 'get_blocks_result_v2'].indexOf(type) < 0) {
+            logger.warn('Not supported message received', { type, response });
+            return;
+        }
+
+        const config: { [key: string]: { version: number } } = {
+            get_blocks_result_v0: { version: 0 },
+            get_blocks_result_v1: { version: 1 },
+            get_blocks_result_v2: { version: 2 },
+        };
+
+        const version = resultVersion ?? config[type].version;
+
+        let block: any = null;
+        let traces: any = [];
+        let deltas: any = [];
+
+        if (response.this_block) {
+            if (this.sidecarPool) {
+                const sidecarResult = this.deserializeBlockViaSidecar(type, version, response);
+                block = sidecarResult.then(result => result.block);
+                traces = sidecarResult.then(result => result.traces);
+                deltas = sidecarResult.then(result => result.deltas);
+            } else if (response.block) {
+                if (version === 2) {
+                    block = this.deserializeParallel('signed_block_variant', response.block)
+                        .then((res: any) => {
+                            if (res[0] === 'signed_block_v1') {
+                                return res[1];
+                            }
+
+                            throw new Error('Unsupported block type received ' + res[0]);
+                        });
+                } else if (version === 1) {
+                    if (response.block[0] === 'signed_block_v1') {
+                        block = response.block[1];
+                    } else {
+                        block = Promise.reject(new Error('Unsupported block type received ' + response.block[0]));
+                    }
+                } else if (version === 0) {
+                    block = this.deserializeParallel('signed_block', response.block);
+                } else {
+                    block = Promise.reject(new Error('Unsupported result type received ' + type));
+                }
+            } else if (this.currentArgs.fetch_block) {
+                if (this.options.allow_empty_blocks) {
+                    logger.warn('Block #' + response.this_block.block_num + ' does not contain block data');
+                } else {
+                    logger.error('Block #' + response.this_block.block_num + ' does not contain block data');
+                    this.blocksQueue.pause();
+                    return;
+                }
+            }
+
+            if (!this.sidecarPool && response.traces) {
+                traces = this.deserializeParallel('transaction_trace[]', response.traces);
+            } else if (!this.sidecarPool && this.currentArgs.fetch_traces) {
+                if (this.options.allow_empty_traces) {
+                    logger.warn('Block #' + response.this_block.block_num + ' does not contain trace data');
+                } else {
+                    logger.error('Block #' + response.this_block.block_num + ' does not contain trace data');
+                    this.blocksQueue.pause();
+                    return;
+                }
+            }
+
+            if (!this.sidecarPool && response.deltas) {
+                deltas = this.deserializeParallel('table_delta[]', response.deltas)
+                    .then(res => this.deserializeDeltas(res));
+            } else if (!this.sidecarPool && this.currentArgs.fetch_deltas) {
+                if (this.options.allow_empty_deltas) {
+                    logger.warn('Block #' + response.this_block.block_num + ' does not contain delta data');
+                } else {
+                    logger.error('Block #' + response.this_block.block_num + ' does not contain delta data');
+                    this.blocksQueue.pause();
+                    return;
+                }
+            }
+        }
+
+        this.blocksQueue.add(async () => {
+            if (response.this_block) {
+                this.currentArgs.start_block_num = response.this_block.block_num + 1;
+            } else {
+                this.currentArgs.start_block_num += 1;
+            }
+
+            if (response.this_block && response.last_irreversible) {
+                this.currentArgs.have_positions = this.currentArgs.have_positions.filter(
+                    row => row.block_num > response.last_irreversible.block_num && row.block_num < response.this_block.block_num
+                );
+
+                if (response.this_block.block_num > response.last_irreversible.block_num) {
+                    this.currentArgs.have_positions.push(response.this_block);
+                }
+            }
+
+            let deserializedTraces = [];
+            let deserializedDeltas = [];
+
+            try {
+                deserializedTraces = await traces;
+            } catch (error) {
+                logger.error('Failed to deserialize traces at block #' + response.this_block.block_num, error);
+
+                this.blocksQueue.clear();
+                this.blocksQueue.pause();
+
+                throw error;
+            }
+
+            try {
+                deserializedDeltas = await deltas;
+            } catch (error) {
+                logger.error('Failed to deserialize deltas at block #' + response.this_block.block_num, error);
+
+                this.blocksQueue.clear();
+                this.blocksQueue.pause();
+
+                throw error;
+            }
+
+            try {
+                await this.processBlock({
+                    this_block: response.this_block,
+                    head: response.head,
+                    last_irreversible: response.last_irreversible,
+                    prev_block: response.prev_block,
+                    block: Object.assign(
+                        { ...response.this_block },
+                        await block,
+                        { last_irreversible: response.last_irreversible },
+                        { head: response.head }
+                    ),
+                    traces: deserializedTraces,
+                    deltas: deserializedDeltas,
+                });
+            } catch (error) {
+                logger.error('Ship blocks queue stopped due to an error at #' + response.this_block.block_num, error);
+
+                this.blocksQueue.clear();
+                this.blocksQueue.pause();
+
+                throw error;
+            }
+
+            this.unconfirmed += 1;
+
+            if (this.unconfirmed >= this.options.min_block_confirmation) {
+                this.send(['get_blocks_ack_request_v0', { num_messages: this.unconfirmed }]);
+                this.unconfirmed = 0;
+            }
+        }).then();
     }
 
     async onClose(): Promise<void> {
@@ -432,6 +467,10 @@ export default class StateHistoryBlockReader {
         this.consumer = consumer;
     }
 
+    getSidecarPool(): ShipSidecarPool | undefined {
+        return this.sidecarPool;
+    }
+
     private async deserializeBlockViaSidecar(
         _resultType: string,
         resultVersion: number,
@@ -441,12 +480,16 @@ export default class StateHistoryBlockReader {
         let blockData: Uint8Array | undefined;
 
         if (response.block) {
-            if (resultVersion === 2) {
+            if (resultVersion === 2 || resultVersion === 1) {
                 blockType = 'signed_block_variant';
-                blockData = response.block;
+                blockData = response.block instanceof Uint8Array
+                    ? response.block
+                    : undefined;
             } else if (resultVersion === 0) {
                 blockType = 'signed_block';
-                blockData = response.block;
+                blockData = response.block instanceof Uint8Array
+                    ? response.block
+                    : undefined;
             }
         } else if (this.currentArgs.fetch_block && !this.options.allow_empty_blocks) {
             throw new Error('Block #' + response.this_block.block_num + ' does not contain block data');
@@ -470,13 +513,7 @@ export default class StateHistoryBlockReader {
 
         let block: any = null;
 
-        if (resultVersion === 1) {
-            if (response.block?.[0] === 'signed_block_v1') {
-                block = response.block[1];
-            } else if (response.block) {
-                throw new Error('Unsupported block type received ' + response.block[0]);
-            }
-        } else if (sidecarResult.block) {
+        if (sidecarResult.block) {
             if (blockType === 'signed_block_variant') {
                 const variantBlock = sidecarResult.block as [string, any];
                 if (variantBlock[0] === 'signed_block_v1') {
@@ -487,6 +524,8 @@ export default class StateHistoryBlockReader {
             } else {
                 block = sidecarResult.block;
             }
+        } else if (resultVersion === 1 && Array.isArray(response.block) && response.block[0] === 'signed_block_v1') {
+            block = response.block[1];
         }
 
         const traces = (sidecarResult.traces ?? []) as any[];

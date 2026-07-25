@@ -35,6 +35,8 @@ constexpr uint32_t kOpPing = 0;
 constexpr uint32_t kOpDeserialize = 1;
 constexpr uint32_t kOpDeserializeBatch = 2;
 constexpr uint32_t kOpDeserializeBlock = 3;
+constexpr uint32_t kOpSetAbi = 4;
+constexpr uint32_t kOpDeserializeContractBatch = 5;
 constexpr uint32_t kOpShutdown = 255;
 
 constexpr uint32_t kFormatText = 0;
@@ -244,6 +246,32 @@ private:
         return json;
     }
 
+    std::string deserializeContractType(
+        Worker& worker,
+        const std::string& contract,
+        const std::string& type,
+        const char* data,
+        size_t size
+    ) {
+        const uint64_t contract_id = abieos_string_to_name(worker.context, contract.c_str());
+        const char* json = abieos_bin_to_json(worker.context, contract_id, type.c_str(), data, size);
+        if (!json) {
+            const char* err = abieos_get_error(worker.context);
+            throw std::runtime_error(
+                std::string("abieos_bin_to_json failed for contract ") + contract + " type " + type + ": " +
+                (err ? err : "unknown"));
+        }
+        return json;
+    }
+
+    void setContractAbi(Worker& worker, const std::string& contract, const std::string& abi_json) {
+        const uint64_t contract_id = abieos_string_to_name(worker.context, contract.c_str());
+        if (!abieos_set_abi(worker.context, contract_id, abi_json.c_str())) {
+            const char* err = abieos_get_error(worker.context);
+            throw std::runtime_error(std::string("abieos_set_abi failed for ") + contract + ": " + (err ? err : "unknown"));
+        }
+    }
+
     std::string deserializeDeltasWithWhitelist(
         Worker& worker,
         const char* data,
@@ -384,6 +412,43 @@ private:
 
             json << ",\"deltas_processed\":true";
             json << '}';
+            return makeOkMsgpackFromJson(json.str());
+        }
+
+        if (job.op == kOpSetAbi) {
+            std::string contract;
+            std::string abi_json;
+            if (!readBytes(pos, end, contract) || !readBytes(pos, end, abi_json)) {
+                throw std::runtime_error("invalid set abi payload");
+            }
+
+            setContractAbi(worker, contract, abi_json);
+            return makeOkMsgpackFromJson("{\"ok\":true}");
+        }
+
+        if (job.op == kOpDeserializeContractBatch) {
+            uint32_t count = 0;
+            if (!readU32(pos, end, count)) {
+                throw std::runtime_error("invalid contract batch count");
+            }
+
+            std::ostringstream json;
+            json << '[';
+            for (uint32_t i = 0; i < count; ++i) {
+                std::string contract;
+                std::string type;
+                std::string data;
+                if (!readBytes(pos, end, contract) || !readBytes(pos, end, type) || !readBytes(pos, end, data)) {
+                    throw std::runtime_error("invalid contract batch row payload");
+                }
+
+                if (i > 0) {
+                    json << ',';
+                }
+                json << deserializeContractType(worker, contract, type, data.data(), data.size());
+            }
+            json << ']';
+
             return makeOkMsgpackFromJson(json.str());
         }
 

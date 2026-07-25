@@ -15,6 +15,8 @@ const OP_PING = 0;
 const OP_DESERIALIZE = 1;
 const OP_DESERIALIZE_BATCH = 2;
 const OP_DESERIALIZE_BLOCK = 3;
+const OP_SET_ABI = 4;
+const OP_DESERIALIZE_CONTRACT_BATCH = 5;
 const OP_SHUTDOWN = 255;
 
 const FORMAT_TEXT = 0;
@@ -23,6 +25,12 @@ const FORMAT_MSGPACK = 1;
 type PendingRequest = {
     resolve: (value: unknown) => void;
     reject: (error: Error) => void;
+};
+
+export type ContractDeserializeRow = {
+    contract: string;
+    type: string;
+    data: Uint8Array | string;
 };
 
 export type ShipBlockDeserializeRequest = {
@@ -186,6 +194,27 @@ class ShipSidecarWorker {
         return this.request(OP_DESERIALIZE_BLOCK, Buffer.concat(chunks)) as Promise<ShipBlockDeserializeResponse>;
     }
 
+    async setAbi(contract: string, abiJson: string): Promise<void> {
+        const payload = Buffer.concat([
+            buildStringBytes(contract),
+            buildStringBytes(abiJson),
+        ]);
+        await this.request(OP_SET_ABI, payload);
+    }
+
+    async deserializeContractBatch(rows: ContractDeserializeRow[]): Promise<unknown[]> {
+        const chunks: Buffer[] = [Buffer.allocUnsafe(4)];
+        writeU32LE(chunks[0], 0, rows.length);
+
+        for (const row of rows) {
+            chunks.push(buildStringBytes(row.contract));
+            chunks.push(buildStringBytes(row.type));
+            chunks.push(buildBinaryChunk(normalizeBinary(row.data)));
+        }
+
+        return this.request(OP_DESERIALIZE_CONTRACT_BATCH, Buffer.concat(chunks)) as Promise<unknown[]>;
+    }
+
     private async ping(): Promise<void> {
         const json = await this.request(OP_PING, Buffer.alloc(0));
         if (!json || typeof json !== 'object' || !(json as { pong?: boolean }).pong) {
@@ -288,6 +317,7 @@ class ShipSidecarWorker {
 export class ShipSidecarPool {
     private workers: ShipSidecarWorker[] = [];
     private nextWorker = 0;
+    private readonly registeredAbis = new Map<string, string>();
 
     constructor(
         private readonly executablePath: string,
@@ -312,6 +342,7 @@ export class ShipSidecarPool {
         await Promise.all(this.workers.map(worker => worker.stop()));
         this.workers = [];
         this.nextWorker = 0;
+        this.registeredAbis.clear();
     }
 
     async deserialize(type: string, data: Uint8Array | string): Promise<unknown> {
@@ -324,6 +355,41 @@ export class ShipSidecarPool {
 
     async deserializeBlock(request: ShipBlockDeserializeRequest): Promise<ShipBlockDeserializeResponse> {
         return this.pickWorker().deserializeBlock(request);
+    }
+
+    async registerAbi(contract: string, abiJson: string): Promise<void> {
+        const cached = this.registeredAbis.get(contract);
+        if (cached === abiJson) {
+            return;
+        }
+
+        await Promise.all(this.workers.map(worker => worker.setAbi(contract, abiJson)));
+        this.registeredAbis.set(contract, abiJson);
+    }
+
+    async deserializeContractBatchOrdered(rows: ContractDeserializeRow[]): Promise<unknown[]> {
+        if (rows.length === 0) {
+            return [];
+        }
+
+        if (this.workers.length === 1) {
+            return this.workers[0].deserializeContractBatch(rows);
+        }
+
+        const chunkSize = Math.ceil(rows.length / this.workers.length);
+        const tasks: Array<Promise<unknown[]>> = [];
+
+        for (let i = 0; i < this.workers.length; i++) {
+            const start = i * chunkSize;
+            const chunk = rows.slice(start, start + chunkSize);
+            if (chunk.length === 0) {
+                continue;
+            }
+            tasks.push(this.workers[i].deserializeContractBatch(chunk));
+        }
+
+        const chunks = await Promise.all(tasks);
+        return chunks.flat();
     }
 
     private pickWorker(): ShipSidecarWorker {
