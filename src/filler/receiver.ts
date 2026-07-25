@@ -80,6 +80,8 @@ export default class StateReceiver {
         this.ship = connection.createShipBlockReader({
             min_block_confirmation: config.ship_min_block_confirmation,
             ds_threads: config.ds_ship_threads ?? 4,
+            ds_use_sidecar: config.ds_use_sidecar ?? false,
+            ds_sidecar_path: config.ds_sidecar_path,
             allow_empty_deltas: false,
             allow_empty_traces: false,
             allow_empty_blocks: false

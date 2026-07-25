@@ -103,6 +103,8 @@ export interface IReaderConfig {
     db_group_blocks: number;
 
     ds_ship_threads: number;
+    ds_use_sidecar?: boolean;
+    ds_sidecar_path?: string;
 
     delete_data: boolean;
 

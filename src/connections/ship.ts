@@ -11,6 +11,7 @@ import {
     IBlockReaderOptions, ShipBlockResponse
 } from '../types/ship.js';
 import { deserializeEosioType, serializeEosioType } from '../utils/eosio.js';
+import { createShipSidecarPool, ShipSidecarPool } from './ship-sidecar-client.js';
 
 export type BlockConsumer = (block: ShipBlockResponse) => any;
 
@@ -30,6 +31,7 @@ export default class StateHistoryBlockReader {
     private stopped: boolean;
 
     private deserializeWorkers: Piscina | undefined;
+    private sidecarPool: ShipSidecarPool | undefined;
 
     private unconfirmed: number;
     private consumer: BlockConsumer;
@@ -107,40 +109,74 @@ export default class StateHistoryBlockReader {
     onMessage(data: any): void {
         try {
             if (!this.shipAbi) {
-                logger.info('Receiving ABI from ship...');
+                void this.initializeShipConnection(data).catch((error) => {
+                    logger.error('Failed to initialize ship deserializer', error);
+                    this.ws.close();
+                });
+                return;
+            }
 
-                this.shipAbi = ABI.from(JSON.parse(data));
+            this.handleShipResult(data);
+        } catch (e) {
+            logger.error(e);
 
-                if (this.options.ds_threads > 0) {
-                    const requested = Math.floor(Number(this.options.ds_threads));
-                    const cpus = availableParallelism() || 4;
-                    const poolSize = Math.max(1, Math.min(requested, cpus));
+            this.ws.close();
+        }
+    }
 
-                    this.deserializeWorkers = new Piscina({
-                        filename: fileURLToPath(new URL('../workers/deserializer.js', import.meta.url)),
-                        minThreads: poolSize,
-                        maxThreads: poolSize,
-                        idleTimeout: Infinity,
-                        workerData: { abi: this.shipAbi.toJSON() }
-                    });
+    private async initializeShipConnection(data: any): Promise<void> {
+        logger.info('Receiving ABI from ship...');
 
-                    if (poolSize !== requested) {
-                        logger.warn(
-                            `Deserialize pool capped to ${poolSize} workers (${requested} requested, ${cpus} CPUs available)`
-                        );
-                    } else {
-                        logger.info(`Deserialize worker pool: ${poolSize} threads`);
-                    }
-                }
+        this.shipAbi = ABI.from(JSON.parse(data));
 
-                for (const table of this.shipAbi.tables) {
-                    this.tables.set(String(table.name), table.type);
-                }
+        if (this.options.ds_use_sidecar) {
+            const requested = Math.floor(Number(this.options.ds_threads));
+            const cpus = availableParallelism() || 4;
+            const poolSize = Math.max(1, Math.min(requested, cpus));
 
-                if (!this.stopped) {
-                    this.requestBlocks();
-                }
+            this.sidecarPool = await createShipSidecarPool(
+                poolSize,
+                this.options.ds_sidecar_path
+            );
+
+            if (poolSize !== requested) {
+                logger.warn(
+                    `Sidecar thread count capped to ${poolSize} (${requested} requested, ${cpus} CPUs available)`
+                );
+            }
+        } else if (this.options.ds_threads > 0) {
+            const requested = Math.floor(Number(this.options.ds_threads));
+            const cpus = availableParallelism() || 4;
+            const poolSize = Math.max(1, Math.min(requested, cpus));
+
+            this.deserializeWorkers = new Piscina({
+                filename: fileURLToPath(new URL('../workers/deserializer.js', import.meta.url)),
+                minThreads: poolSize,
+                maxThreads: poolSize,
+                idleTimeout: Infinity,
+                workerData: { abi: this.shipAbi.toJSON() }
+            });
+
+            if (poolSize !== requested) {
+                logger.warn(
+                    `Deserialize pool capped to ${poolSize} workers (${requested} requested, ${cpus} CPUs available)`
+                );
             } else {
+                logger.info(`Deserialize worker pool: ${poolSize} threads`);
+            }
+        }
+
+        for (const table of this.shipAbi.tables) {
+            this.tables.set(String(table.name), table.type);
+        }
+
+        if (!this.stopped) {
+            this.requestBlocks();
+        }
+    }
+
+    private handleShipResult(data: any): void {
+        try {
                 const [type, response] = deserializeEosioType('result', data, this.shipAbi);
 
                 if (['get_blocks_result_v0', 'get_blocks_result_v1', 'get_blocks_result_v2'].indexOf(type) >= 0) {
@@ -155,7 +191,12 @@ export default class StateHistoryBlockReader {
                     let deltas: any = [];
 
                     if (response.this_block) {
-                        if (response.block) {
+                        if (this.sidecarPool) {
+                            const sidecarResult = this.deserializeBlockViaSidecar(type, config[type].version, response);
+                            block = sidecarResult.then(result => result.block);
+                            traces = sidecarResult.then(result => result.traces);
+                            deltas = sidecarResult.then(result => result.deltas);
+                        } else if (response.block) {
                             if (config[type].version === 2) {
                                 block = this.deserializeParallel('signed_block_variant', response.block)
                                     .then((res: any) => {
@@ -186,9 +227,9 @@ export default class StateHistoryBlockReader {
                             }
                         }
 
-                        if (response.traces) {
+                        if (!this.sidecarPool && response.traces) {
                             traces = this.deserializeParallel('transaction_trace[]', response.traces);
-                        } else if(this.currentArgs.fetch_traces) {
+                        } else if (!this.sidecarPool && this.currentArgs.fetch_traces) {
                             if (this.options.allow_empty_traces) {
                                 logger.warn('Block #' + response.this_block.block_num + ' does not contain trace data');
                             } else {
@@ -198,10 +239,10 @@ export default class StateHistoryBlockReader {
                             }
                         }
 
-                        if (response.deltas) {
+                        if (!this.sidecarPool && response.deltas) {
                             deltas = this.deserializeParallel('table_delta[]', response.deltas)
                                 .then(res => this.deserializeDeltas(res));
-                        } else if(this.currentArgs.fetch_deltas) {
+                        } else if (!this.sidecarPool && this.currentArgs.fetch_deltas) {
                             if (this.options.allow_empty_deltas) {
                                 logger.warn('Block #' + response.this_block.block_num + ' does not contain delta data');
                             } else {
@@ -288,7 +329,6 @@ export default class StateHistoryBlockReader {
                 } else {
                     logger.warn('Not supported message received', {type, response});
                 }
-            }
         } catch (e) {
             logger.error(e);
 
@@ -315,6 +355,11 @@ export default class StateHistoryBlockReader {
         if (this.deserializeWorkers) {
             await this.deserializeWorkers.destroy();
             this.deserializeWorkers = undefined;
+        }
+
+        if (this.sidecarPool) {
+            await this.sidecarPool.stop();
+            this.sidecarPool = undefined;
         }
 
         this.reconnect();
@@ -387,7 +432,78 @@ export default class StateHistoryBlockReader {
         this.consumer = consumer;
     }
 
+    private async deserializeBlockViaSidecar(
+        _resultType: string,
+        resultVersion: number,
+        response: any
+    ): Promise<{ block: any; traces: any[]; deltas: any[] }> {
+        let blockType = '';
+        let blockData: Uint8Array | undefined;
+
+        if (response.block) {
+            if (resultVersion === 2) {
+                blockType = 'signed_block_variant';
+                blockData = response.block;
+            } else if (resultVersion === 0) {
+                blockType = 'signed_block';
+                blockData = response.block;
+            }
+        } else if (this.currentArgs.fetch_block && !this.options.allow_empty_blocks) {
+            throw new Error('Block #' + response.this_block.block_num + ' does not contain block data');
+        }
+
+        if (this.currentArgs.fetch_traces && !response.traces && !this.options.allow_empty_traces) {
+            throw new Error('Block #' + response.this_block.block_num + ' does not contain trace data');
+        }
+
+        if (this.currentArgs.fetch_deltas && !response.deltas && !this.options.allow_empty_deltas) {
+            throw new Error('Block #' + response.this_block.block_num + ' does not contain delta data');
+        }
+
+        const sidecarResult = await this.sidecarPool!.deserializeBlock({
+            blockType: blockType || undefined,
+            block: blockData,
+            traces: response.traces,
+            deltas: response.deltas,
+            deltaWhitelist: this.deltaWhitelist,
+        });
+
+        let block: any = null;
+
+        if (resultVersion === 1) {
+            if (response.block?.[0] === 'signed_block_v1') {
+                block = response.block[1];
+            } else if (response.block) {
+                throw new Error('Unsupported block type received ' + response.block[0]);
+            }
+        } else if (sidecarResult.block) {
+            if (blockType === 'signed_block_variant') {
+                const variantBlock = sidecarResult.block as [string, any];
+                if (variantBlock[0] === 'signed_block_v1') {
+                    block = variantBlock[1];
+                } else {
+                    throw new Error('Unsupported block type received ' + variantBlock[0]);
+                }
+            } else {
+                block = sidecarResult.block;
+            }
+        }
+
+        const traces = (sidecarResult.traces ?? []) as any[];
+        const deltas = sidecarResult.deltas_processed
+            ? ((sidecarResult.deltas ?? []) as any[])
+            : sidecarResult.deltas
+                ? await this.deserializeDeltas(sidecarResult.deltas as any[])
+                : [];
+
+        return { block, traces, deltas };
+    }
+
     private async deserializeParallel(type: string, data: Uint8Array): Promise<any> {
+        if (this.sidecarPool) {
+            return this.sidecarPool.deserialize(type, data);
+        }
+
         if (this.options.ds_threads > 0) {
             const pool = this.deserializeWorkers;
             if (!pool) {
@@ -403,6 +519,10 @@ export default class StateHistoryBlockReader {
     }
 
     private async deserializeArrayParallel(rows: Array<{type: string, data: Uint8Array}>): Promise<any> {
+        if (this.sidecarPool) {
+            return this.sidecarPool.deserializeBatch(rows);
+        }
+
         if (this.options.ds_threads > 0) {
             const pool = this.deserializeWorkers;
             if (!pool) {
